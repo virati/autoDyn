@@ -1,107 +1,91 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Nov 11 17:57:21 2019
+Created on Tue Feb 11 17:21:34 2020
 
 @author: virati
-Main library for autoDyn methods
-This file will contain the primary JAX related methods that analyse variables of the (dyn_sys) class
+Barebones class for dynamical system
 """
 
-import numpy as npo
-import jax.numpy as np
-from jax import grad, jit, vmap, jvp
-from numpy import ndenumerate
+import numpy as np
 import matplotlib.pyplot as plt
-from jax import jit, jacfwd, jacrev
-
-import operator
 import networkx as nx
+import pdb
+import scipy.signal as sig
 
-# Generate a class that wraps functions
-class operable:
-    def __init__(self, f):
-        self.f = f
+class dyn_sys:
+    def __init__(self,dynamics,control,**kwargs):
+        self.dt = 0.001
+        self.N = kwargs['N']
+        if 'H' in kwargs.keys(): self.H = kwargs['H'];
+        else: H = np.ones_like
         
-    def __call__(self, x):
-        return self.f(x)
+        if 'L' in kwargs.keys(): self.L = kwargs['L']
+        if 'G' in kwargs.keys():
+            self.G = kwargs['G']
+            if 'L' in kwargs.keys(): print('You defined both G and L!! Dont do that')
+            raise Warning
+            self.L = nx.laplacian_matrix(self.G).todense()
+        
+        self.fdyn = dynamics
+        self.gctr = control
+        
+    def integrator(self,exog=0):
+        k1 = self.fdyn(self.state,ext_e = exog) * self.dt
+        k2 = self.fdyn(self.state + .5*k1,ext_e = exog)*self.dt
+        k3 = self.fdyn(self.state + .5*k2,ext_e = exog)*self.dt
+        k4 = self.fdyn(self.state + k3,ext_e = exog)*self.dt
+        
+        new_state = self.state + (k1 + 2*k2 + 2*k3 + k4)/6
+        new_state += np.random.normal(0,1,new_state.shape) * self.dt
+        
+        return new_state
+        
+    def run(self,x_i):
+        end_time=10
+        tvect = np.linspace(0,end_time,int(end_time/self.dt))
+        self.state = x_i
+        self.state_roster = []
 
-# Convert oeprators to the corresponding function
-def op_to_function_op(op):
-    def function_op(self, operand):
-        def f(x):
-            return op(self(x), operand(x))
-        return operable(f)
-    return function_op
- 
-for name, op in [(name, getattr(operator, name)) for name in dir(operator) if "__" in name]:
-    try:
-        op(1,2)
-    except TypeError:
-        pass
-    else:
-        setattr(operable, name, op_to_function_op(op))
-
-#%% Lie Derivatives Block
-
-def L_f_x(f,h,x):
-    #return jacfwd(h)(x).squeeze()
-    #print()
-    #print(f(x))
-    return npo.dot(jacfwd(h)(x).squeeze(),f(x))
-    #return npo.dot(operable(vmap(jacfwd(h))),f)
-
-def L_f(f,h):
-    return npo.dot(operable(jacfwd(h)),operable(f))
-
-def L_f_o(f,h,order=1):
-    c = [h]
-    for ii in range(order):
-        c.append(npo.dot(operable(jacfwd(c[ii])),f))
-    
-    return c[-1]
-
-def dotL_f(f,h,order=1):
-    return npo.sum(L_d(h,f,order=order))
-
-def brack_f_g(f,g):
-    c = operable(jcb(f)) * g
-    cinv = operable(jcb(g)) * f
-    
-    return cinv
-    #print(c(np.array([1.,1.,1.])))
-    #print(cinv(np.array([1.,1.,1.])))
-
-#%% Drift function libraries
-@operable
-def f1(x):
-    #return np.array([-x[1],-x[0],-x[2] + x[1]])
-    return np.array([-x[1]**2 + x[2],-x[0]**3,-x[2]**2 + x[1]])
-
-@operable
-def f2(x):
-    return np.array([-x[0] + x[1],x[1],x[2] - x[0]])
-
-def h(x):
-    return 2*x[0] + 3*x[2]
-
-if __name__ == '__main__':
-    f_grad = jacfwd(f1)
-    x0 = np.array([1.,1.,2.]).reshape(-1,1)
-    print('F1, only\n',f_grad(x0).squeeze())
-    #SUCCESS!
-    
-    f_all_grad = jacfwd(f1 + f2)
-    print('F1+F2\n',f_all_grad(x0).squeeze())
-    #SUCCESS!
-    
-    print('Lie deriv (actual)\n',L_f_x(f1,f2,x0))
-    #SUCCESS!
-    
-    #lie
-    L_f1_f2 = L_f_o(f1,f2,order=2)
-    #print('Lie (jax)\n',np.sum(L_f1_f2(x0).squeeze(),axis=1).T) #if we are only doing 1st order Lie derivative
-    
-    print('Lie (jax)\n',np.sum(L_f1_f2(x0).squeeze(),axis=(1,2)).T) #WORKS!!!!!!!!
+        for tt,time in enumerate(tvect):
+            print(time)
+            self.state_roster.append(self.state)
+            self.state = self.integrator()
+        
+        self.state_roster = np.array(self.state_roster).squeeze().T
+        self.tvect = tvect
+        
+    def sim(self,x_i,element=0):
+        self.run(x_i = x_i)
+        self.measured_ts = self.measure(self.state_roster)
     
     
+    def measure(self,x):
+        H_matrix = np.ones_like(self.state)
+        return np.sin(2 * np.pi * np.multiply(np.dot(H_matrix.T,x),self.tvect)).reshape(-1,1)
+    
+    
+    ### PLOTTING FUNCTIONS
+    def plot_states(self):
+        plt.figure()
+        plt.plot(self.state_roster.T)
+    
+    def plot_measured(self,element=0):
+        plt.figure()
+        plt.plot(self.measured_ts)
+        
+        T,F,SG = sig.spectrogram(self.measured_ts.T,fs = 1/self.dt,nfft=1024,nperseg=256,window='blackmanharris')
+        plt.figure()
+        #pdb.set_trace()
+        plt.pcolormesh(F,T,np.log10(SG))
+        
+        
+if __name__=='__main__':
+    print('Test Run')
+    node_N = 10
+    network = nx.erdos_renyi_graph(node_N,0.8)
+    #msys = dyn_sys(N=3,L = np.array([[1,2,-0.1],[2,-1,-0.1],[1,1,1]]))
+    msys = dyn_sys(N=3,G = network)
+    msys.sim(x_i = np.random.normal(0,1,size=(node_N,1)))
+    msys.plot_states()
+    msys.plot_measured()
