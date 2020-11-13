@@ -130,6 +130,9 @@ def g1(x):
 def h(x):
     return 2*x[0] + 3*x[2]
 
+
+#%%
+# Do some testing of the above library
 if __name__ == '__main__':
     x0 = np.array([1.,1.,2.]).reshape(-1,1)
     readout = liefn(f1,f2,order=3)
