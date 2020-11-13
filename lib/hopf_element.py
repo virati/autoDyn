@@ -124,7 +124,6 @@ class HopfNet():
         q = 1-w
         
         
-        
         xd = w * (mu * x - y - x * (x**2 + y**2))
         yd = q * (x + mu * y - y * (x**2 + y**2))
     

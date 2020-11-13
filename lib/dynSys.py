@@ -12,12 +12,19 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import pdb
 import scipy.signal as sig
+from dynLib import *
 
 # Method to merge local and remote architectures
 
 def consensus(x,params):
     L = params['L']
     return -np.dot(L,x)
+
+def kuramoto(x,params):
+    D = params['D']
+    w = params['w']
+    k = params['k']
+    return w - k * np.dot(D,np.sin(np.dot(D.T,x)))
 
 def rand_squar(x,params):
     x_dot = np.zeros_like(x)
@@ -26,8 +33,8 @@ def rand_squar(x,params):
     
     for ii in range(x.shape[0]):
         for jj in range(x.shape[0]):
-            x_dot[ii] = np.tanh(L[ii,jj] * x[ii] * (x[jj] - c[ii]))
-            
+            x_dot[ii] = -(L[ii,jj] * x[ii] * (x[jj] - c[ii]))
+
     return x_dot
 
 def zeros(x):
@@ -36,22 +43,23 @@ def zeros(x):
 # Basic class for dynamical system
 class dyn_sys:
     dt = 0.001
-    param_labels = ['L','C','others']
+    param_labels = ['L','C']
+    
     def __init__(self,params,dynamics,control,**kwargs):
         self.params = params
+        #have to have at least a connectivity L
         self.L = params['L']
-        self.N = self.L.shape[0]
-        
-        
+       
         # bring in main methods
         self.fdyn = dynamics
         self.gctr = control
-        
-    def integrator(self,exog=0):
-        k1 = self.fdyn(self.state,self.params) * self.dt
-        k2 = self.fdyn(self.state + .5*k1,self.params)*self.dt
-        k3 = self.fdyn(self.state + .5*k2,self.params)*self.dt
-        k4 = self.fdyn(self.state + k3,self.params)*self.dt
+    
+    # Main Runge-Kutta Integrator
+    def integrator(self):
+        k1 = (self.fdyn(self.state,self.params) + self.gctr(self.u)) * self.dt
+        k2 = (self.fdyn(self.state + .5*k1,self.params)  + self.gctr(self.u))*self.dt
+        k3 = (self.fdyn(self.state + .5*k2,self.params)  + self.gctr(self.u))*self.dt
+        k4 = (self.fdyn(self.state + k3,self.params)  + self.gctr(self.u))*self.dt
         
         new_state = self.state + (k1 + 2*k2 + 2*k3 + k4)/6
         #new_state += np.random.normal(0,1,new_state.shape) * self.dt
@@ -75,9 +83,13 @@ class dyn_sys:
         self.run(x_i = x_i)
         self.measured_ts = self.measure(self.state_roster)
     
-    # Send the state through the measurement operator
+    # Return the full state trajectory directly
     def states(self):
         return self.state_roster
+
+class measurement:
+    def __init__(self,sys):
+        self.dyn_sys = sys
     
     def measure(self,x):
         H_matrix = np.ones_like(self.state)
@@ -102,9 +114,12 @@ if __name__=='__main__':
     L_net = nx.linalg.laplacianmatrix.laplacian_matrix(network).todense()
     #msys = dyn_sys(N=3,L = np.array([[1,2,-0.1],[2,-1,-0.1],[1,1,1]]))
     
-    params = {'L': L_net,'c': np.random.uniform(0.1,5,size=(10,1))}
-    msys = dyn_sys(params=params,dynamics = rand_squar,control=zeros)
-    x_init = np.random.normal(0,10,size=(node_N,1))
+    params = {'L': L_net,'c': np.random.uniform(0.1,5,size=(10,1)),'alpha': np.random.uniform(0.1,5,size=(10,1)),
+              'D':nx.linalg.graphmatrix.incidence_matrix(network).todense(),
+              'w':1.2,
+              'k':5}
+    msys = dyn_sys(params=params,dynamics = kuramoto,control=zeros)
+    x_init = np.random.uniform(-np.pi/2,np.pi/2,size=(node_N,1))
     msys.sim(x_i = x_init,t_end=10)
     msys.plot_measured()
     #%%

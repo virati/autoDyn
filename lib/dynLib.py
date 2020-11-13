@@ -13,10 +13,15 @@ import networkx as nx
 import pdb
 import scipy.signal as sig
 
-def wc_nmm(x,L):
-    for ii in x:
-        for jj in x:
-            
+# WC should be N regions x D elements - D = 2 for excitatory and inhibitory
+def wc_nmm(x,params):
+    L = params['L']
+    alpha = params['alpha']
+    beta = params['beta']
+    x_dot = np.zeros_like(x)
+    for ii in x.shape[0]:
+        x_dot[ii,0] = alpha[ii]*np.dot(L[ii,:],x[:,0]) - beta[ii]*x[ii,1]
+        
     return x_dot
 
 if __name__=='__main__':
