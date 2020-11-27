@@ -5,6 +5,7 @@ Created on Mon Dec 26 15:45:43 2016
 
 A simple hopf system that encodes a value by "generating" a limit cycle -> r is the value being encoded
 @author: virati
+OBSOLETE!!!!!!!!!!!!!! - 11/20
 """
 
 import numpy as np
