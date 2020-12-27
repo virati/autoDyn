@@ -17,8 +17,8 @@ from dynSys import dsys
 def consensus(params,x):
     return -np.dot(params['L'],x)
 
-def sindyn(params,x):
-    return params['w'] - params['k']/len(x) *np.dot(params['D'],np.sin(np.dot(params['D'].T,x)))
+def sindyn(params,x,u=0):
+    return params['w'] - params['k']/len(x) *np.dot(params['D'],np.sin(np.dot(params['D'].T,x))) + u
 
 def hopf2d(params,x):
     # x needs to be ~2d for this
@@ -42,6 +42,36 @@ def rand_squar(params,x):
 
     return x_dot
 
+'''Weighed W-C Class'''
+
+class W_C_w(W_C):
+    def __init__(self,kwargs**):
+        super.__init__(kwargs)
+        
+    def fdyn(self,params,x,u=0):
+        e = np.copy(x[:,0]) #region number is first, then element inside
+        i = np.copy(x[:,1]) #region number is first, then element inside
+        
+        tau = params['tau']
+        alpha = params['alpha']
+        beta = params['beta']
+        w = params['w']
+        thresh = params['thresh']
+        net_k = params['net_k']
+        D = params['D']
+        K = params['K']
+        
+        e_dot = np.zeros(shape=(x.shape[0],1))
+        i_dot = np.zeros(shape=(x.shape[0],1))
+        
+        for nn in range(x.shape[0]):
+            e_dot_p = params['T_e'] * (-e[nn] + sigm(-beta['e'] * (e[nn] * w['ee'] - i[nn] * w['ei'] - thresh['e'] + net_k * np.dot(D[nn,:],np.dot(K,np.dot(D.T[:,nn],e))) + u)))
+            i_dot_p = params['T_i'] * (-i[nn] + sigm(-beta['i'] * (-i[nn] * w['ii'] + e[nn] * w['ie'] - thresh['i'])))
+            
+            e_dot[nn] = e_dot_p
+            i_dot[nn] = i_dot_p
+            
+        return np.array([e_dot,i_dot]).squeeze().T
 
 #%% Classes below
 class W_C(dsys):

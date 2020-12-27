@@ -24,6 +24,9 @@ class brain_net:
     def laplacian(self):
         return nx.linalg.laplacian_matrix(self.G).todense()
     
+    def incidence(self):
+        return nx.linalg.incidence_matrix(self.G).todense()
+    
     def plot(self):
         plt.figure()
         nx.draw(self.G)
@@ -72,7 +75,7 @@ class dsys:
             self.tlen=kwargs['tlen']
         
         self.tvect = np.arange(0,self.tlen,self.dt)
-            
+        
     '''Params depend on the dynamics being implemented'''
     
     def set_params(self,params):
@@ -102,13 +105,15 @@ class dsys:
         pass
     #    self.state = (self.state + np.pi) % (2 * np.pi) - np.pi
     
-    def set_ctrl(self,u=[]):
-        if u == []: self.u = np.zeros_like(self.tvect)
-        elif u == 'sine': self.u = 20*np.sin(2 * np.pi * 10 * self.tvect)
-        else: self.u = u
-        
     '''run the dynamics for an initial x for tlen time'''
-    def run(self):
+    def run(self,**kwargs):
+        if 'tlen' in kwargs:
+            self.tvect = np.arange(0,kwargs['tlen'],self.dt)
+      
+        if 'u' not in kwargs: self.u = np.zeros_like(self.tvect)
+        elif kwargs['u'] == 'sine': self.u = 20*np.sin(2 * np.pi * 10 * self.tvect)
+        else: self.u = u
+      
         self.state_raster = []
         for tt,time in enumerate(self.tvect):
             self.state_raster.append(np.copy(self.state))
@@ -117,7 +122,27 @@ class dsys:
             
         self.state_raster = np.array(self.state_raster).squeeze()
         
+
+''' Class for behavior'''
+class behavior:
+    dim = 2
+    def __init__(self,dsys,d=2):
+        self.dim = d
+        self.dsys = dsys
+        self.params = {'d':self.dim}
+
+    def gamma(self,params,states):
+        d = params['d']
+        return states[:,:,-1] #default behavior just returns first d brain states
+    
+    def get_behav(self):
+        betas = np.zeros((self.dim,self.dsys.state_raster.shape[0]))
+        for dd in range(self.dim):
+            betas[dd,:] = self.gamma(self.params,self.dsys.state_raster)
+            
+        return betas
         
+
 ''' Class for measuring a dynamical system'''
 class measurement:
     def __init__(self,sys):
