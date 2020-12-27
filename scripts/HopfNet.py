@@ -39,7 +39,7 @@ class HNet(dsys):
         try: r_dot = 0.1*(-r**2 * (r-c))# - 0.01*np.dot(L,r))# + np.random.normal(size=r.shape)
         except: pdb.set_trace()
         
-        theta_dot = w - K * np.dot(D,np.sin(np.dot(D.T,theta))) #d/r
+        theta_dot = w + d/r - K * np.dot(D,np.sin(np.dot(D.T,theta)))
         
         return np.array([r_dot,theta_dot]).squeeze().T
 
