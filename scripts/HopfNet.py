@@ -12,7 +12,12 @@ import numpy as np
 from dynSys import dsys, brain_net
 import matplotlib.pyplot as plt
 import pdb
+import scipy.signal as sig
 
+import jax.numpy as jnp
+
+plt.close('all')
+#%%
 def sigmoid(x):
     return np.tanh(x)
 
@@ -27,12 +32,14 @@ class HNet(dsys):
         d = params['d']
         w = params['w']
         L = params['L']
+        K = params['K']
+        D = params['D']
             
         
-        try: r_dot = 0.1*(-r**2 * (r-c) - 0.01*np.dot(L,r))
+        try: r_dot = 0.1*(-r**2 * (r-c))# - 0.01*np.dot(L,r))# + np.random.normal(size=r.shape)
         except: pdb.set_trace()
         
-        theta_dot = w - d/r
+        theta_dot = w - K * np.dot(D,np.sin(np.dot(D.T,theta))) #d/r
         
         return np.array([r_dot,theta_dot]).squeeze().T
 
@@ -53,15 +60,19 @@ def readout(raster):
 def cost(behavs):
     return np.sum(behavs,axis=1)[:,0]
 
-main_net = brain_net(10,50)
+
+N = 10
+main_net = brain_net(N,50)
 
 param_set = {'c':5,
              'd':10,
-             'w':4,
-             'L':main_net.laplacian()}
+             'w':4+np.random.normal(0,1.0,size=(N,1)),
+             'L':main_net.laplacian(),
+             'D':main_net.incidence(),
+             'K':0.3}
 
 test_net = HNet(params=param_set)
-test_net.init_x(x=np.random.uniform(0,1,size=(10,2)))
+test_net.init_x(x=np.random.uniform(0,1,size=(N,2)))
 test_net.run(tlen=20,u='sine')
 #%%
 plt.figure()
@@ -71,10 +82,28 @@ plt.plot(test_net.state_raster[:,:,1].squeeze())
 plt.figure()
 plt.plot(test_net.state_raster[:,:,0].squeeze() * np.exp(-1j * test_net.state_raster[:,:,1].squeeze()))
 plt.xlabel('time')
+
+#%%
+# Spectrogram
+timeseries = test_net.state_raster[:,:,0].squeeze() * np.exp(-1j * test_net.state_raster[:,:,1].squeeze())
+timeseries += np.random.normal(size=timeseries.shape)
+dsf = 5
+timeseries = np.sum(sig.decimate(timeseries.T,q=dsf),axis=0)
+
+plt.figure()
+plt.plot(timeseries)
+cc = 2
+#F,T,SG = sig.spectrogram(timeseries,fs=1/(dsf*0.001))
+#plt.figure()
+#plt.pcolormesh(T,F,np.log10(np.abs(SG)))
+
 #%%
 plt.figure()
 plt.polar(test_net.state_raster[:,:,1].squeeze(),test_net.state_raster[:,:,0].squeeze(),linewidth=10)
 
+#%%
+plt.figure()
+plt.plot(test_net.state_raster[:,:,1])
 #%%
 plt.figure()
 behavs = readout(test_net.state_raster)

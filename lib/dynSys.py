@@ -14,6 +14,15 @@ import pdb
 import scipy.signal as sig
 from mayavi import mlab
 
+def rk_integrator(fdyn,params,state,dt=0.001):    
+    k1 = fdyn(params,state) * dt
+    k2 = fdyn(params,state + .5*k1)*dt
+    k3 = fdyn(params,state + .5*k2)*dt
+    k4 = fdyn(params,state + k3)*dt
+    
+    state_change = (k1 + 2*k2 + 2*k3 + k4)/6
+    return state_change  
+
 '''A simple 'brain network' class that does basic things on top of networkx'''
 class brain_net:
     G = []
