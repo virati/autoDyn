@@ -34,14 +34,18 @@ class HNet(dsys):
         L = params['L']
         K = params['K']
         D = params['D']
+        P = params['P']
             
         
-        try: r_dot = 0.1*(-r**2 * (r-c))# - 0.01*np.dot(L,r))# + np.random.normal(size=r.shape)
-        except: pdb.set_trace()
+        #r_dot = -K*r*(r-d)*(r-c) - P*np.dot(L,r)# + np.random.normal(size=r.shape)
+        r_dot = K * (-r**2 * (r-c) - P * np.dot(L,r))
+        theta_dot = w - d/r#  K * np.dot(D,np.sin(np.dot(D.T,theta)))
         
-        theta_dot = w + d/r - K * np.dot(D,np.sin(np.dot(D.T,theta)))
-        
-        return np.array([r_dot,theta_dot]).squeeze().T
+        return np.real(np.array([r_dot,theta_dot]).squeeze().T)
+
+class controller:
+    def __init__(self):
+        pass
 
 def readout(raster):
     #assume raster is an T x N x D - Time x Nodes x internal dims
@@ -62,26 +66,44 @@ def cost(behavs):
 
 
 N = 10
-main_net = brain_net(N,50)
+main_net = brain_net(N,20)
 
+#cool pic
 param_set = {'c':5,
-             'd':10,
-             'w':4+np.random.normal(0,1.0,size=(N,1)),
+             'd':15,
+             'w':4+np.random.normal(0,0.5,size=(N,1)),
              'L':main_net.laplacian(),
              'D':main_net.incidence(),
-             'K':0.3}
+             'K':0.1,
+             'P':0.01}
+
+
+# param_set = {'c':5,
+#              'd':15,
+#              'w':4+np.random.normal(0,0.5,size=(N,1)),
+#              'L':main_net.laplacian(),
+#              'D':main_net.incidence(),
+#              'K':0.1,
+#              'P':0.5}
 
 test_net = HNet(params=param_set)
-test_net.init_x(x=np.random.uniform(0,1,size=(N,2)))
-test_net.run(tlen=20,u='sine')
-#%%
+test_net.init_x(x=np.hstack((np.random.uniform(0,10,size=(N,1)),np.random.uniform(-np.pi,np.pi,size=(N,1)))))
+test_net.run(tlen=50,u='sine')
+
 plt.figure()
-plt.plot(test_net.state_raster[:,:,0].squeeze())
-plt.plot(test_net.state_raster[:,:,1].squeeze())
+plt.polar(test_net.state_raster[:,:,1].squeeze(),test_net.state_raster[:,:,0].squeeze(),linewidth=2,alpha=0.9)
+
+
 #%%
-plt.figure()
-plt.plot(test_net.state_raster[:,:,0].squeeze() * np.exp(-1j * test_net.state_raster[:,:,1].squeeze()))
-plt.xlabel('time')
+if 0:
+    plt.figure()
+    plt.plot(test_net.state_raster[:,:,0].squeeze())
+    plt.plot(test_net.state_raster[:,:,1].squeeze())
+#%%
+if 0:
+    plt.figure()
+    plt.plot(test_net.state_raster[:,:,0].squeeze() * np.exp(-1j * test_net.state_raster[:,:,1].squeeze()))
+    plt.xlabel('time')
 
 #%%
 # Spectrogram
@@ -98,8 +120,6 @@ cc = 2
 #plt.pcolormesh(T,F,np.log10(np.abs(SG)))
 
 #%%
-plt.figure()
-plt.polar(test_net.state_raster[:,:,1].squeeze(),test_net.state_raster[:,:,0].squeeze(),linewidth=10)
 
 #%%
 plt.figure()

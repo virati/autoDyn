@@ -30,6 +30,12 @@ def hopf2d(params,x):
 def sigm(x):
     return 1/(1+np.exp(-x))
 
+#Oscillatory Dynamics - have to assume x \in \mathbb{C} for this to work since 2-d and all...
+def oscillator(params,x):
+    c = params['c'] #Coupling between real and imaginary
+    #if x.shape[0] == 1 and x.dtype != np.complex_: raise Exception TypeError e
+    
+    return -np.dot(c,x)
 
 def rand_squar(params,x):
     x_dot = np.zeros_like(x)
@@ -41,37 +47,6 @@ def rand_squar(params,x):
             x_dot[ii] = -(L[ii,jj] * x[ii] * (x[jj] - c[ii]))
 
     return x_dot
-
-'''Weighed W-C Class'''
-
-class W_C_w(W_C):
-    def __init__(self,kwargs**):
-        super.__init__(kwargs)
-        
-    def fdyn(self,params,x,u=0):
-        e = np.copy(x[:,0]) #region number is first, then element inside
-        i = np.copy(x[:,1]) #region number is first, then element inside
-        
-        tau = params['tau']
-        alpha = params['alpha']
-        beta = params['beta']
-        w = params['w']
-        thresh = params['thresh']
-        net_k = params['net_k']
-        D = params['D']
-        K = params['K']
-        
-        e_dot = np.zeros(shape=(x.shape[0],1))
-        i_dot = np.zeros(shape=(x.shape[0],1))
-        
-        for nn in range(x.shape[0]):
-            e_dot_p = params['T_e'] * (-e[nn] + sigm(-beta['e'] * (e[nn] * w['ee'] - i[nn] * w['ei'] - thresh['e'] + net_k * np.dot(D[nn,:],np.dot(K,np.dot(D.T[:,nn],e))) + u)))
-            i_dot_p = params['T_i'] * (-i[nn] + sigm(-beta['i'] * (-i[nn] * w['ii'] + e[nn] * w['ie'] - thresh['i'])))
-            
-            e_dot[nn] = e_dot_p
-            i_dot[nn] = i_dot_p
-            
-        return np.array([e_dot,i_dot]).squeeze().T
 
 #%% Classes below
 class W_C(dsys):
@@ -141,7 +116,39 @@ class Ksys(dsys):
     def post_integrator(self):
         pass
         self.state = (self.state + np.pi) % (2 * np.pi) - np.pi
+
+
+'''Weighed W-C Class'''
+class W_C_w(W_C):
+    def __init__(self,**kwargs):
+        super.__init__(kwargs)
         
+    def fdyn(self,params,x,u=0):
+        e = np.copy(x[:,0]) #region number is first, then element inside
+        i = np.copy(x[:,1]) #region number is first, then element inside
+        
+        tau = params['tau']
+        alpha = params['alpha']
+        beta = params['beta']
+        w = params['w']
+        thresh = params['thresh']
+        net_k = params['net_k']
+        D = params['D']
+        K = params['K']
+        
+        e_dot = np.zeros(shape=(x.shape[0],1))
+        i_dot = np.zeros(shape=(x.shape[0],1))
+        
+        for nn in range(x.shape[0]):
+            e_dot_p = params['T_e'] * (-e[nn] + sigm(-beta['e'] * (e[nn] * w['ee'] - i[nn] * w['ei'] - thresh['e'] + net_k * np.dot(D[nn,:],np.dot(K,np.dot(D.T[:,nn],e))) + u)))
+            i_dot_p = params['T_i'] * (-i[nn] + sigm(-beta['i'] * (-i[nn] * w['ii'] + e[nn] * w['ie'] - thresh['i'])))
+            
+            e_dot[nn] = e_dot_p
+            i_dot[nn] = i_dot_p
+            
+        return np.array([e_dot,i_dot]).squeeze().T
+
+
 ''' The Delay-W-C class for DO Modeling'''
 
 class W_C_d(dsys):

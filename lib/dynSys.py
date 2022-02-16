@@ -177,3 +177,4 @@ class measurement:
 if __name__=='__main__':
     print('Unit Testing the Setup of a Generic Dynamical System')
     node_N = 10
+    print('Unit Test Complete')
