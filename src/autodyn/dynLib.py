@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import pdb
 import scipy.signal as sig
-from dynSys import dsys
+from .dynSys import dsys
 
 def consensus(params,x):
     return -np.dot(params['L'],x)
