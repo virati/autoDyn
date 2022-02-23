@@ -10,7 +10,6 @@ Library of various dynamics functions
 import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
-import pdb
 import scipy.signal as sig
 from .dynSys import dsys
 
