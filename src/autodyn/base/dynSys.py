@@ -85,12 +85,16 @@ class dsys:
     
     '''run the dynamics for an initial x for tlen time'''
     def run(self,**kwargs):
+        if not 'zero_start' in kwargs: self.state = np.random.normal(0,1,size=self.state.shape)
         if 'tlen' in kwargs:
             self.tvect = np.arange(0,kwargs['tlen'],self.dt)
+        if 'params' in kwargs:
+            self.params = kwargs['params']
       
         if 'u' not in kwargs: self.u = np.zeros_like(self.tvect)
         elif kwargs['u'] == 'sine': self.u = 20*np.sin(2 * np.pi * 10 * self.tvect)
-        else: self.u = u
+        elif kwargs['u'] == 'impulse': self.u = np.zeros_like(self.tvect);self.u[0] = 1
+        else: self.u = kwargs['u']
       
         self.state_raster = []
         for tt,time in enumerate(self.tvect):

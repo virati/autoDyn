@@ -13,8 +13,11 @@ import networkx as nx
 import scipy.signal as sig
 from ..base.dynSys import dsys
 
-def consensus(params,x):
-    return -np.dot(params['L'],x)
+#def consensus(params,x):
+#    return -np.dot(params['L'],x)
+
+def consensus(params,x,u=0):
+    return -np.dot(params['D'],np.dot(params['D'].T,x))
 
 def sindyn(params,x,u=0):
     return params['w'] - params['k']/len(x) *np.dot(params['D'],np.sin(np.dot(params['D'].T,x))) + u
@@ -149,7 +152,6 @@ class W_C_w(W_C):
 
 
 ''' The Delay-W-C class for DO Modeling'''
-
 class W_C_d(dsys):
     
     params = {'T_e': 5,
