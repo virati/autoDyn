@@ -17,7 +17,7 @@ from ..base.dynSys import dsys
 #    return -np.dot(params['L'],x)
 
 def consensus(params,x,u=0):
-    return -np.dot(params['D'],np.dot(params['D'].T,x))
+    return -np.dot(params['D'],np.dot(params['D'].T,(x - params['w'])))
 
 def sindyn(params,x,u=0):
     return params['w'] - params['k']/len(x) *np.dot(params['D'],np.sin(np.dot(params['D'].T,x))) + u
