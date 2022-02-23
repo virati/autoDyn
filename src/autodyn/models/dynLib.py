@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
 import scipy.signal as sig
-from .dynSys import dsys
+from ..base.dynSys import dsys
 
 def consensus(params,x):
     return -np.dot(params['L'],x)

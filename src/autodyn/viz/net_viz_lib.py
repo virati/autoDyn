@@ -9,6 +9,7 @@ Created on Mon Jun 22 19:53:34 2020
 import networkx as nx
 from mayavi import mlab
 import numpy as np
+from ..base.dynSys import dsys
 
 def plain_render_graph(H):
     # reorder nodes from 0,len(G)-1
@@ -74,3 +75,8 @@ def render_graph(H,read,write):
     
     mlab.savefig('mayavi2_spring.png')
     #mlab.show() # interactive window
+
+
+
+def render_system(system : dsys):
+    pass
