@@ -19,6 +19,14 @@ from ..base.dynSys import dsys
 def consensus(params,x,u=0):
     return -np.dot(params['D'],np.dot(params['D'].T,(x - params['w'])))
 
+def unity_collapser(x):
+    return np.sum(x,axis=-1)
+
+def unity_2d_collapser(x):
+    x_len = x.shape[0]
+    print(x.shape)
+    return np.array([x[...,:x_len//2].sum(axis=-1),x[...,x_len//2:].sum(axis=-1)])
+
 def sindyn(params,x,u=0):
     return params['w'] - params['k']/len(x) *np.dot(params['D'],np.sin(np.dot(params['D'].T,x))) + u
 

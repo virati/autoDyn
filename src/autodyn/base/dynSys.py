@@ -43,6 +43,7 @@ class dsys:
     dt = 0.001
     params = {}
     tlen = 10
+    state_raster = None
     
     def __init__(self,N=2,d=1,**kwargs):
         self.state = np.zeros(shape=(N,d))
@@ -58,6 +59,16 @@ class dsys:
     
     def set_params(self,params):
         self.params = params
+
+    def set_behavior(self, mapping : callable):
+        self.Gamma = mapping
+
+    def apply_behavior(self):
+        if self.state_raster is None:
+            raise ValueError("This system has not been run and there is no output behavior...")
+        
+        return self.Gamma(self.state_raster)
+
     
     '''Base Runge-Kutta Integrator Method'''
     def integrator(self,u=0):
