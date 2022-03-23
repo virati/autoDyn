@@ -21,3 +21,10 @@ Other libraries would be more appropriate for efforts to model massive whole-bra
 The main application driving the development of this repository is its use in neuroengineering, particularly deep brain stimulation.
 
 ![Licensed under Creative Commons](imgs/general_model.png)
+
+
+
+---
+
+All images and text are licensed under Creative Commons CC-BY License (https://creativecommons.org/licenses/by/4.0/legalcode)
+By Vineet Tiruvadi (virati@gmail.com, vineet@tiruvadi.net)
