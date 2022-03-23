@@ -16,3 +16,8 @@ This work was an effort to build a library, from scratch.
 Since starting this there has been great progress in nonlinear controllability analyses, but the hope is that this library is an easy-to-use drop in for toy-models of the brain.
 Many of the models that clinicians use in their day-to-day job can easily be collapsed into simple toy-models and this library is meant to analyse those toy-models.
 Other libraries would be more appropriate for efforts to model massive whole-brain networks derived from massive datasets.
+
+## Neuroengineering
+The main application driving the development of this repository is its use in neuroengineering, particularly deep brain stimulation.
+
+![Licensed under Creative Commons](imgs/general_model.png)
