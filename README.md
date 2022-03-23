@@ -27,4 +27,5 @@ The main application driving the development of this repository is its use in ne
 ---
 
 All images and text are licensed under Creative Commons CC-BY License (https://creativecommons.org/licenses/by/4.0/legalcode)
+
 By Vineet Tiruvadi (virati@gmail.com, vineet@tiruvadi.net)
