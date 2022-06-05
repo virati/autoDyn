@@ -1,1 +1,1 @@
-from autodyn.base import dynSys
+from autodyn.core import dynamical as dyn

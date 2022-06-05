@@ -1,30 +1,38 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 
-class network:
-    G = []
 
-    def __init__(self, N=10, structure = None, **kwargs):
+class connectivity:
+    def __init__(self, N, structure=None, **kwargs):
         if callable(structure):
-            self.G = structure(N,**kwargs)
+            self.G = structure(N, kwargs["proportion"])
         else:
-            self.G = nx.gnm_random_graph(N, kwargs['connection_density'])
-
-    @property
-    def L(self):
-        return nx.linalg.laplacian_matrix(self.G).todense()
+            self.G = nx.generators.random_graphs.erdos_renyi_graph(
+                N, kwargs["proportion"]
+            )
 
     @property
     def D(self):
-        return nx.linalg.incidence_matrix(self.G).todense()
-
-    def plot(self):
-        plt.figure()
-        nx.draw(self.G)
+        return nx.linalg.graphmatrix.incidence_matrix(self.G).todense().T
 
     @property
     def spectrum(self):
-        #L = nx.laplacian_matrix(self.G)
-        #e = np.linalg.eigvals(L.A)
+        # L = nx.laplacian_matrix(self.G)
+        # e = np.linalg.eigvals(L.A)
 
         return nx.laplacian_spectrum(self.G)
+
+    #%% PLOTTING METHODS
+
+    def plot_incidence(self):
+
+        plt.figure()
+        plt.imshow(self.D.T)
+        plt.title("Incidence")
+
+    def plot_spectrum(self):
+        plt.figure()
+        plt.plot(self.spectrum)
+        plt.title("Spectrum of Laplacian")
+
+        plt.suptitle(f"Number of components: {nx.number_connected_components(self.G)}")

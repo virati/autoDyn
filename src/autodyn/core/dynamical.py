@@ -11,216 +11,108 @@ import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
 import scipy.signal as sig
+import jax
+from ..utils.functions import unity
+
+# Integrator
+def rk_integrator(
+    f_dyn: callable, state: np.ndarray, u: np.ndarray = 0, dt: float = 0.01, **kwargs
+):
+    k1 = f_dyn(state, u=u, **kwargs) * dt
+    k2 = f_dyn(state + 0.5 * k1, u=u, **kwargs) * dt
+    k3 = f_dyn(state + 0.5 * k2, u=u, **kwargs) * dt
+    k4 = f_dyn(state + k3, u=u, **kwargs) * dt
+
+    new_state = state + (k1 + 2 * k2 + 2 * k3 + k4) / 6
+
+    return new_state
 
 
-def rk_integrator(fdyn, params, state, dt=0.001):
-    k1 = fdyn(params, state) * dt
-    k2 = fdyn(params, state + 0.5 * k1) * dt
-    k3 = fdyn(params, state + 0.5 * k2) * dt
-    k4 = fdyn(params, state + k3) * dt
+class system:
+    def __init__(self, f, D: int = 3, net_graph: nx.Graph = None):
+        self.x = np.zeros((D, 1))
+        self.D = D
+        self.f = f
 
-    state_change = (k1 + 2 * k2 + 2 * k3 + k4) / 6
-    return state_change
+        self.gen_connectivity()
+        self.post_step = unity
 
+    def set_post_step(self, func: callable):
+        self.post_step = func
 
-"""A simple 'brain network' class that does basic things on top of networkx"""
-
-
-class brain_net:
-    G = []
-
-    def __init__(self, N=10, connectivity_level=50):
-        self.G = nx.gnm_random_graph(N, connectivity_level)
-
-        # self.G = nx.erdos_renyi_graph(node_N, connectivity_level)
-
-    def L(self):
-        return nx.linalg.laplacian_matrix(self.G).todense()
-
-    @property
-    def D(self):
-        return nx.linalg.incidence_matrix(self.G).todense()
-
-    def plot(self):
-        plt.figure()
-        nx.draw(self.G)
-
-
-class ctrl_sys:
-    state = []
-    dt = 0.001
-    params = {}
-    tlen = 10
-    state_raster = None
-
-    def __init__(self, N=2, d=1, **kwargs):
-        self.state = np.zeros(shape=(N, d))
-        self.N = N
-
-        if "params" in kwargs:
-            self.params = kwargs["params"]
-        if "tlen" in kwargs:
-            self.tlen = kwargs["tlen"]
-
-        if "G_net" in kwargs:
-            self.link_network(kwargs["G_net"])
-
-        self.tvect = np.arange(0, self.tlen, self.dt)
-
-    def link_network(self, G):
-        if G.D.shape[0] != self.state.shape[0]:
-            raise ValueError(
-                f"Linked Network {G.D.shape[0]} does not have {self.N} number of nodes..."
-            )
-        self.G_net = G
-        self.params["D"] = self.G_net.D
-
-    def link_measurement(self, H):
-        self.H = H
-
-    """Params depend on the dynamics being implemented"""
-
-    def set_params(self, params):
-        self.params = params
-
-    def set_behavior(self, mapping: callable):
-        self.Gamma = mapping
-
-    def apply_behavior(self):
-        if self.state_raster is None:
-            raise ValueError(
-                "This system has not been run and there is no output behavior..."
-            )
-
-        return self.Gamma(self.state_raster)
-
-    """Base Runge-Kutta Integrator Method"""
-
-    def set_drift(self, fdrift):
-        # ned some basic checks here, like whether there are three arguments in the function call: parameter, state, control
-
-        self.fdyn = fdrift
-
-    def integrator(self, u=0):
-
-        k1 = self.fdyn(self.params, self.state, u) * self.dt
-        k2 = self.fdyn(self.params, self.state + 0.5 * k1, u) * self.dt
-        k3 = self.fdyn(self.params, self.state + 0.5 * k2, u) * self.dt
-        k4 = self.fdyn(self.params, self.state + k3, u) * self.dt
-
-        self.state += (k1 + 2 * k2 + 2 * k3 + k4) / 6
-
-        # self.state += np.random.normal(0,1,self.state.shape) * self.dt
-
-        # return new_state
-
-    """initialize x"""
-
-    def init_x(self, x):
-        self.state = np.copy(x)
-
-    """What do we do after integrator? This would be where we reset phases, for example"""
-
-    def post_integrator(self):
-        pass
-
-    #    self.state = (self.state + np.pi) % (2 * np.pi) - np.pi
-
-    """run the dynamics for an initial x for tlen time"""
-
-    def run(self, **kwargs):
-        if not "zero_start" in kwargs:
-            self.state = np.random.normal(0, 1, size=self.state.shape)
-        if "tlen" in kwargs:
-            self.tvect = np.arange(0, kwargs["tlen"], self.dt)
-        if "params" in kwargs:
-            self.params = kwargs["params"]
-
-        if "u" not in kwargs:
-            self.u = np.zeros_like(self.tvect)
-        elif kwargs["u"] == "sine":
-            self.u = 20 * np.sin(2 * np.pi * 10 * self.tvect)
-        elif kwargs["u"] == "impulse":
-            self.u = np.zeros_like(self.tvect)
-            self.u[0] = 1
-        else:
-            self.u = kwargs["u"]
-
-        self.state_raster = []
-        for tt, time in enumerate(self.tvect):
-            self.state_raster.append(np.copy(self.state))
-            self.integrator(self.u[tt])
-            self.post_integrator()
-
-        self.state_raster = np.array(self.state_raster).squeeze()
-
-    def plot_states(self):
-        plt.figure()
-        plt.plot(self.state_raster)
-
-    def plot_measured(self):
-        plt.figure()
-        plt.plot(self.H(self.state_raster, self.tvect[:, None]))
-
-
-""" Class for behavior"""
-
-
-class behavior:
-    dim = 2
-
-    def __init__(self, dsys, d=2):
-        self.dim = d
-        self.dsys = dsys
-        self.params = {"d": self.dim}
-
-    def gamma(self, params, states):
-        d = params["d"]
-        return states[:, :, -1]  # default behavior just returns first d brain states
-
-    def get_behav(self):
-        betas = np.zeros((self.dim, self.dsys.state_raster.shape[0]))
-        for dd in range(self.dim):
-            betas[dd, :] = self.gamma(self.params, self.dsys.state_raster)
-
-        return betas
-
-
-""" Class for measuring a dynamical system"""
-
-
-class measurement:
-    def __init__(self, sys):
-        self.dyn_sys = sys
-
-    def measure(self, x, func=[]):
-        if func == []:
-            H_fn = np.ones_like(self.dyn_sys.state_raster)
-        else:
-            H_fn = func
-
-        return np.sin(2 * np.pi * np.multiply(np.dot(H_fn.T, x), self.tvect)).reshape(
-            -1, 1
+    def gen_connectivity(self):
+        nodes = [1, 2, 3, 4, 5, 6]
+        G = nx.Graph()
+        G.add_nodes_from(nodes)
+        G.add_weighted_edges_from(
+            [
+                (1, 2, 1),
+                (2, 3, 1),
+                (1, 6, 1),
+                (1, 3, 1),
+                (3, 4, 1),
+                (4, 5, 1),
+                (4, 6, 1),
+                (5, 6, 1),
+            ]
         )
 
-    ### PLOTTING FUNCTIONS
-    def plot_measured(self, element=0):
+        # L = nx.to_numpy_matrix(G)
+        L = nx.linalg.laplacianmatrix.laplacian_matrix(G).todense()
+        self.G = G
+        self.L = L
+
+    def simulate(self, T, dt=0.01, rasterize=True, **kwargs):
+        tvect = np.arange(0, T, dt)
+        controlled = False
+
+        x_state = np.random.normal(0, 1, (self.D, 1))
+        if "keep_positive" in kwargs.keys():
+            x_state = np.abs(x_state)
+
+        x_raster = []
+
+        if "stim" in kwargs.keys():
+            controlled = True
+
+        for tidx, time in enumerate(tvect):
+            if controlled:
+                x_new = rk_integrator(
+                    self.f, x_state, dt=0.01, u=kwargs["stim"][tidx], **kwargs
+                )
+            else:
+                x_new = rk_integrator(self.f, x_state, dt=0.01, **kwargs)
+
+            x_state = self.post_step(x_new)
+
+            if rasterize:
+                x_raster.append(x_state)
+
+        if x_raster:
+            self.raster = np.array(x_raster).squeeze()
+
+    def plot_raster(self):
+        plt.plot(self.raster)
+        plt.show()
+
+    def plot_phase(self):
+        if self.D == 3:
+            fig = plt.figure()
+            ax = fig.gca(projection="3d")
+            ax.plot(self.raster[:, 0], self.raster[:, 1], self.raster[:, 2])
+            plt.draw()
+            plt.title("Phase Portrait")
+        else:
+            fig = plt.figure()
+            plt.plot(self.raster)
+            plt.title("Trajectories in Time")
+
+    def plot_measure(self):
         plt.figure()
-        plt.plot(self.measured_ts)
+        plt.plot(self.H(self.raster))
+        plt.title("Measured Trajectories in Time")
 
-    def SG_measured(self, element=0):
-        T, F, SG = sig.spectrogram(
-            self.measured_ts.T,
-            fs=1 / self.dt,
-            nfft=1024,
-            nperseg=256,
-            window="blackmanharris",
-        )
+    def plot_polar(self):
         plt.figure()
-        plt.pcolormesh(F, T, np.log10(SG))
-
-
-if __name__ == "__main__":
-    print("Unit Testing the Setup of a Generic Dynamical System")
-    node_N = 10
-    print("Unit Test Complete")
+        plt.plot(np.real(self.raster[:, 0] * np.exp(1j * self.raster[:, 1])))
+        plt.title("Measured Trajectories in Time")
