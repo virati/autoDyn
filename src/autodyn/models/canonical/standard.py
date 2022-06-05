@@ -35,8 +35,6 @@ def controlled_hopf(x, g, u, **kwargs):
 
     c = kwargs["c"]
     w = kwargs["w"]
-    g = kwargs["g"]
-    u = kwargs["u"]
 
     new_x[0] = -(r**2) * (r - c) - g * u
     new_x[1] = w

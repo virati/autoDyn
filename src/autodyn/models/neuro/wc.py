@@ -6,8 +6,9 @@ def sigm(x):
 
 
 def wc_drift(x, **kwargs):
-    e = x[0]  # region number is first, then element inside
-    i = x[1]  # region number is first, then element inside
+    print(f"{x.shape}")
+    e = x[0]
+    i = x[1]
 
     params = kwargs["params"]
 
@@ -16,11 +17,7 @@ def wc_drift(x, **kwargs):
     beta = params["beta"]
     w = params["w"]
     thresh = params["thresh"]
-    net_k = params["net_k"]
-    L = params["L"]
 
-    e_dot = np.zeros(shape=(x.shape[0], 1))
-    i_dot = np.zeros(shape=(x.shape[0], 1))
     e_dot_p = params["T_e"] * (
         -e + sigm(-beta["e"] * (e * w["ee"] - i * w["ei"] - thresh["e"]))
     )
@@ -28,4 +25,7 @@ def wc_drift(x, **kwargs):
         -i + sigm(-beta["i"] * (-i * w["ii"] + e * w["ie"] - thresh["i"]))
     )
 
-    return np.array([e_dot_p, i_dot_p]).squeeze().T
+    new_state = np.array([e_dot_p, i_dot_p])
+    print(f"{new_state.shape}")
+
+    return new_state

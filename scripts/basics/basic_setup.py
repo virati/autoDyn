@@ -1,6 +1,11 @@
 #%%
 from autodyn.core import dynamical as dyn
-from autodyn.models.canonical.standard import lorenz, consensus, single_hopf
+from autodyn.models.canonical.standard import (
+    lorenz,
+    consensus,
+    single_hopf,
+    controlled_hopf,
+)
 from autodyn.core.network import connectivity
 
 #%%
@@ -29,7 +34,7 @@ stim = np.zeros((int(times // dt) + 1, 1))
 stim[stim.shape[0] // 2 :: 10] = 40
 
 # Setup and run our dynamics
-hopf_single = dyn.system(single_hopf, D=2)
+hopf_single = dyn.system(controlled_hopf, D=2)
 hopf_single.simulate(
     T=times,
     dt=dt,
@@ -43,3 +48,5 @@ hopf_single.simulate(
     keep_positive=True,
 )
 hopf_single.plot_polar()
+
+# %%
