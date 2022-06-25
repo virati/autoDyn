@@ -6,6 +6,9 @@ Made with whole-brain models of brain activity and DBS in mind.
 
 ## What is Lie Controllability
 Lie controllability (LC) is the nonlinear version of controllability analyses.
+More broadly, controllability analysis directly studies how systems behave and how our interventions change how systems behave.
+This give us a powerful way to optimize our inteventions directly and rationally - an alternative to grid searching through a potentially vast parameter space.
+
 In LC we can directly observe the interactions that our controller has on the dynamics of the system, and then use these interactions to design controllers with desired properties.
 
 ## Why this library?
