@@ -1,7 +1,7 @@
 absl-py==1.1.0
 apptools==5.1.0
 asttokens==2.0.5
--e git+https://github.com/virati/autoDyn.git@dd6ff9a9766e5e00e35101df0bde874cf94d2007#egg=autodyn
+-e git+https://github.com/virati/autoDyn.git@8fbf76a26b1da001295f94505c824f7600047e1b#egg=autodyn
 backcall==0.2.0
 black==22.1.0
 bleach==5.0.1
