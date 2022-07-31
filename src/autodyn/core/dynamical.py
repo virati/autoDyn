@@ -11,21 +11,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
 import scipy.signal as sig
-import jax
-from ..utils.functions import unity
+from autodyn.utils.functions import unity
 
-# Integrator
-def rk_integrator(
-    f_dyn: callable, state: np.ndarray, u: np.ndarray = 0, dt: float = 0.01, **kwargs
-):
-    k1 = f_dyn(state, u=u, **kwargs) * dt
-    k2 = f_dyn(state + 0.5 * k1, u=u, **kwargs) * dt
-    k3 = f_dyn(state + 0.5 * k2, u=u, **kwargs) * dt
-    k4 = f_dyn(state + k3, u=u, **kwargs) * dt
-
-    new_state = state + (k1 + 2 * k2 + 2 * k3 + k4) / 6
-
-    return new_state
+from autodyn.core.integrators.runge_kutta import rk_integrator
 
 
 class system:

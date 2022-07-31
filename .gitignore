@@ -4,3 +4,4 @@ assets/*
 __pycache__
 *.egg-info/
 .vscode/
+dist/
