@@ -101,7 +101,12 @@ class system:
         plt.plot(self.raster)
         plt.show()
 
-    def plot_phase(self):
+    def plot_phase(self, d1, d2):
+        fig = plt.figure()
+        plt.plot(self.raster[:, d1], self.raster[:, d2])
+        plt.title("Phase")
+
+    def plot_phase_full(self):
         if self.D == 3:
             fig = plt.figure()
             ax = fig.gca(projection="3d")
@@ -121,4 +126,4 @@ class system:
     def plot_polar(self):
         plt.figure()
         plt.plot(np.real(self.raster[:, 0] * np.exp(1j * self.raster[:, 1])))
-        plt.title("Measured Trajectories in Time")
+        plt.title("Polar Trajectories in Time")
