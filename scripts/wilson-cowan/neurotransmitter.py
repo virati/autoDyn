@@ -1,6 +1,7 @@
 #%%
 from autodyn.core import dynamical as dyn
 from autodyn.models.neuro.wc import wc_drift, wc_input
+from autodyn.core import control
 
 #%%
 wilson_cowan = dyn.system(wc_drift, D=2)
@@ -18,15 +19,16 @@ wilson_cowan.simulate(T=100, dt=0.1, params=param_set)
 wilson_cowan.plot_phase()
 
 #%%
-T = 100
-dt = 0.1
-tpts = int(T // dt) + 1
-import numpy as np
+def step_u(x):
+    _, t = x.shape
+    u = np.zero_like(x)
+    u[t // 2 :: 2] = 1
 
-tvect = np.linspace(0, T, tpts)
+    return u
 
-u = np.zeros_like(tvect)
-u[tpts // 2 :: 2] = 1
+
+controller = control(u=step_u)
+
 
 wilson_cowan = dyn.system(wc_input, D=2)
 wilson_cowan.simulate(T=T, dt=dt, params=param_set, stim=u)
