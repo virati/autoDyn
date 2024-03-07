@@ -1,7 +1,6 @@
 absl-py==1.1.0
 apptools==5.1.0
 asttokens==2.0.5
--e git+https://github.com/virati/autoDyn.git@8fbf76a26b1da001295f94505c824f7600047e1b#egg=autodyn
 backcall==0.2.0
 black==22.1.0
 bleach==5.0.1
@@ -26,7 +25,6 @@ importlib-resources==5.9.0
 ipykernel==6.9.1
 ipython==8.0.1
 jax==0.3.15
-jaxlib==0.3.15
 jedi==0.18.1
 jeepney==0.8.0
 jupyter-client==7.1.2
