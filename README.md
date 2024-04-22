@@ -1,5 +1,6 @@
 # AutoDyn
 
+A Python library for dynamical systems $\pm$ control theoretic analyse
 A Python library for Lie-controllability anlyses on dynamical systems models.
 Made with whole-brain models of brain activity and DBS in mind.
 
