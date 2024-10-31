@@ -7,7 +7,7 @@ class network:
     def set_connectivity(self, input_connectivity):
         pass
 
-    def set_drift(self, input_drift_function):
+    def set_driftf(self, input_drift_function):
         pass
 
     def set_region_euclidean(self, input_region_coords):
@@ -19,4 +19,3 @@ class network:
     def set_euclideans(self, input_anatomy):
         self.set_region_euclidean(input_anatomy['regions'])
         self.set_tract_euclidean(input_anatomy['tracts'])
-        
