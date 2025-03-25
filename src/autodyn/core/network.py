@@ -4,12 +4,11 @@ import matplotlib.pyplot as plt
 
 class connectivity:
     def __init__(self, N, structure=None, **kwargs):
-        if callable(structure):
-            self.G = structure(N, kwargs["proportion"])
-        else:
-            self.G = nx.generators.random_graphs.erdos_renyi_graph(
-                N, kwargs["proportion"]
-            )
+        self._topology = None
+        self._arcs = None
+
+        if len(self._arcs) != len(self._topology.edges):
+            raise ValueError("Number of arcs must match number of edges in topology")
 
     @property
     def D(self):
@@ -22,10 +21,9 @@ class connectivity:
 
         return nx.laplacian_spectrum(self.G)
 
-    #%% PLOTTING METHODS
+    # %% PLOTTING METHODS
 
     def plot_incidence(self):
-
         plt.figure()
         plt.imshow(self.D.T)
         plt.title("Incidence")

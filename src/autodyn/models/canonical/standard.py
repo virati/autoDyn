@@ -1,5 +1,6 @@
 import numpy as np
 
+
 # Dynamics Functions
 def consensus(x, **kwargs):
     new_x = np.zeros_like(x)
@@ -42,7 +43,7 @@ def controlled_hopf(x, g, u, **kwargs):
     return new_x
 
 
-def single_hopf(x, **kwargs):
+def hopf(x, **kwargs):
     new_x = np.zeros_like(x)
 
     r = x[0]
