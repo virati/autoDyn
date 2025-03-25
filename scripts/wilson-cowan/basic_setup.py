@@ -1,6 +1,7 @@
 #%%
 from autodyn.core import dynamical as dyn
 from autodyn.models.neuro.wc import wc_drift, wc_input
+import numpy as np
 
 #%%
 wilson_cowan = dyn.system(wc_drift, D=2)
@@ -21,8 +22,6 @@ wilson_cowan.plot_phase()
 T = 100
 dt = 0.1
 tpts = int(T // dt) + 1
-import numpy as np
-
 tvect = np.linspace(0, T, tpts)
 
 u = np.zeros_like(tvect)

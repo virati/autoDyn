@@ -101,7 +101,7 @@ class system:
         plt.plot(self.raster)
         plt.show()
 
-    def plot_phase(self, d1, d2):
+    def plot_phase(self, d1=0, d2=1):
         fig = plt.figure()
         plt.plot(self.raster[:, d1], self.raster[:, d2])
         plt.title("Phase")
