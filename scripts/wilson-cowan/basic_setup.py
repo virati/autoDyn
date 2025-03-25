@@ -1,6 +1,7 @@
 #%%
 from autodyn.core import dynamical as dyn
 from autodyn.models.neuro.wc import wc_drift, wc_input
+from autodyn.core.network import connectivity
 import numpy as np
 
 #%%

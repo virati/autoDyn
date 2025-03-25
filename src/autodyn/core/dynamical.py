@@ -109,7 +109,7 @@ class system:
     def plot_phase_full(self):
         if self.D == 3:
             fig = plt.figure()
-            ax = fig.gca(projection="3d")
+            ax = fig.add_subplot(projection="3d")
             ax.plot(self.raster[:, 0], self.raster[:, 1], self.raster[:, 2])
             plt.draw()
             plt.title("Phase Portrait")
