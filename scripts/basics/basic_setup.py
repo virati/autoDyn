@@ -11,7 +11,7 @@ from autodyn.core.network import connectivity
 #%%
 lorenz_sys = dyn.system(lorenz, D=3)
 lorenz_sys.simulate(T=50, dt=0.01, sigma=10, rho=28, beta=8 / 3)
-lorenz_sys.plot_phase()
+lorenz_sys.plot_phase(d1=0,d2=1)
 
 
 #%%
@@ -19,8 +19,7 @@ test_sys = dyn.system(consensus, D=10)
 brain_net = connectivity(10, proportion=0.4)
 
 test_sys.simulate(T=100, dt=0.1, D=brain_net.D.T)
-
-test_sys.plot_phase()
+test_sys.plot_phase(d1=0,d2=2)
 
 brain_net.plot_incidence()
 brain_net.plot_spectrum()
@@ -48,5 +47,3 @@ hopf_single.simulate(
     keep_positive=True,
 )
 hopf_single.plot_polar()
-
-# %%
