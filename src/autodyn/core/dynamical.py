@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Tue Feb 11 17:21:34 2020
-
-@author: virati
-Barebones class for dynamical systems
-"""
-
 from typing import Optional
 
 import numpy as np
