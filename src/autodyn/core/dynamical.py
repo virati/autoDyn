@@ -9,8 +9,8 @@ from autodyn.core import control
 from autodyn.core.integrators.runge_kutta import rk_integrator
 
 
-class system:
-    def __init__(self, f, D: int = 3, net_graph: nx.Graph = None):
+class dsys:
+    def __init__(self, f, D: int = 3):
         self.x = np.zeros((D, 1))
         self.D = D
         self.f = f

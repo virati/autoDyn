@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from typing import Optional, Callable
-import numpy as np
+from autodyn.core.dynamical import dsys
 from autodyn.core.network import connectivity
 import networkx as nx
 from autodyn.utils.functions import unity
 
 
 class microstruct:
-    def __init__(self):
-        pass
+    def __init__(self, dynamics: dsys):
+        self._dynamics = None
 
     @property
     def dynamics(self):

@@ -11,7 +11,7 @@ stim = np.zeros((int(times // dt) + 1, 1))
 stim[stim.shape[0] // 2 :: 10] = 40
 
 # Setup and run our dynamics
-hopf_single = dyn.system(controlled_hopf, D=2)
+hopf_single = dyn.dsys(controlled_hopf, D=2)
 hopf_single.simulate(
     T=times,
     dt=dt,

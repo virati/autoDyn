@@ -3,7 +3,7 @@ from autodyn.models.canonical.standard import consensus
 from autodyn.core.network import connectivity
 
 # %%
-test_sys = dyn.system(consensus, D=10)
+test_sys = dyn.dsys(consensus, D=10)
 brain_net = connectivity(10, proportion=0.4)
 
 test_sys.simulate(T=100, dt=0.1, D=brain_net.D.T)
