@@ -3,8 +3,12 @@ import jax.numpy as np
 import numpy as nnp
 
 
-def L_lift(x):
+class lifter:
+    def __init__(self):
+        pass
 
+
+def L_lift(x):
     a * x + a * x**3
 
 

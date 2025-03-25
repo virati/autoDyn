@@ -1,5 +1,4 @@
 # %%
-import numpy as np
 from autodyn.core import dynamical as dyn
 from autodyn.models.neuro.scalar import kuramoto
 

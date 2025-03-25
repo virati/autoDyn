@@ -9,57 +9,26 @@ from autodyn.core import control
 from autodyn.core.integrators.runge_kutta import rk_integrator
 
 
-class dsys:
+class system:
+    def __init__(self):
+        pass
+
+    def transfer_function(self, inputs, params):
+        pass
+
+    def forward(self, inputs, params):
+        return self.transfer_function(inputs, params)
+
+
+class dsys(system):
     def __init__(self, f, D: int = 3):
         self.x = np.zeros((D, 1))
         self.D = D
         self.f = f
-        self.u_func: Optional[callable] = None
 
-        self.gen_connectivity()
-        self.post_step = unity
+        self.post_step = None
 
-    @property
-    def u(self):
-        self._u: control
-        if self.u_func is None:
-            return np.zeros_like(self.x)
-
-        if not self._u:
-            self._u = control(self.u_func)
-        return self._u
-
-    @u.setter
-    def u(self, value: np.ndarray):
-        self._u = control()
-        self._u.raw = value
-
-    def set_post_step(self, func: callable):
-        self.post_step = func
-
-    def gen_connectivity(self):
-        nodes = [1, 2, 3, 4, 5, 6]
-        G = nx.Graph()
-        G.add_nodes_from(nodes)
-        G.add_weighted_edges_from(
-            [
-                (1, 2, 1),
-                (2, 3, 1),
-                (1, 6, 1),
-                (1, 3, 1),
-                (3, 4, 1),
-                (4, 5, 1),
-                (4, 6, 1),
-                (5, 6, 1),
-            ]
-        )
-
-        # L = nx.to_numpy_matrix(G)
-        L = nx.linalg.laplacianmatrix.laplacian_matrix(G).todense()
-        self.G = G
-        self.L = L
-
-    def simulate(self, T, dt=0.01, rasterize=True, **kwargs):
+    def forward(self, T, dt=0.01, rasterize=True, **kwargs):
         tvect = np.arange(0, T, dt)
         controlled = False
 
