@@ -7,6 +7,7 @@ from autodyn.models.canonical.standard import (
     controlled_hopf,
 )
 from autodyn.core.network import connectivity
+import numpy as np
 
 #%%
 lorenz_sys = dyn.system(lorenz, D=3)
@@ -26,7 +27,7 @@ brain_net.plot_incidence()
 brain_net.plot_spectrum()
 #%%
 # Design our stimulation waveform here
-import numpy as np
+
 
 times = 50
 dt = 0.01
