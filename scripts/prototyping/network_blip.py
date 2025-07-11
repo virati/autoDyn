@@ -1,228 +1,327 @@
 # %%
+"""
+Spiking Neural Network Simulation using Brian2
+This simulation creates a network where neurons fire when their input
+exceeds a threshold and immediately reset to zero.
+"""
+
 import numpy as np
-import networkx as nx
 import matplotlib.pyplot as plt
-import random
+import networkx as nx
+from brian2 import (
+    NeuronGroup,
+    Synapses,
+    SpikeMonitor,
+    StateMonitor,
+    SpikeGeneratorGroup,
+    run,
+    seed,
+    prefs,
+    mV,
+    ms,
+)
 
 
-class NetworkBlipSimulation:
+class SpikingNetworkSimulation:
     def __init__(
         self,
-        num_nodes=20,
+        num_neurons=20,
         connection_prob=0.3,
-        threshold=2.0,
-        initial_activation_prob=0.1,
+        threshold_voltage=-50.0,  # mV
+        reset_voltage=-70.0,  # mV
+        synaptic_weight=10.0,  # mV
+        simulation_time=100,  # ms
+        initial_spike_prob=0.2,
         random_seed=42,
     ):
         """
-        Initialize the network blip simulation.
+        Initialize the spiking neural network simulation using Brian2.
 
         Parameters:
-        - num_nodes: Number of nodes in the network
-        - connection_prob: Probability of connection between any two nodes
-        - threshold: Global threshold for node firing
-        - initial_activation_prob: Probability of initial node activation
+        - num_neurons: Number of neurons in the network
+        - connection_prob: Probability of connection between neurons
+        - threshold_voltage: Firing threshold (mV)
+        - reset_voltage: Reset voltage after spike (mV)
+        - synaptic_weight: Weight of synaptic connections (mV)
+        - simulation_time: Total simulation time (ms)
+        - initial_spike_prob: Probability of initial spikes
         - random_seed: Random seed for reproducibility
         """
-        self.num_nodes = num_nodes
-        self.threshold = threshold
+        self.num_neurons = num_neurons
+        self.connection_prob = connection_prob
+        self.threshold_voltage = threshold_voltage
+        self.reset_voltage = reset_voltage
+        self.synaptic_weight = synaptic_weight
+        self.simulation_time = simulation_time
         self.random_seed = random_seed
 
-        # Set random seed
+        # Set random seed for reproducibility
         np.random.seed(random_seed)
-        random.seed(random_seed)
+        seed(random_seed)
 
-        # Create directed graph
-        self.graph = nx.erdos_renyi_graph(
-            num_nodes, connection_prob, directed=True, seed=random_seed
+        # Create the network
+        self._build_network()
+        self._create_connectivity()
+        self._setup_monitoring()
+        self._add_initial_stimulation(initial_spike_prob)
+
+    def _build_network(self):
+        """Build the neuron group with threshold dynamics."""
+        # Define neuron model - simple threshold model
+        neuron_eqs = """
+        dv/dt = -v/(10*ms) : volt
+        """
+
+        # Create neuron group
+        self.neurons = NeuronGroup(
+            self.num_neurons,
+            neuron_eqs,
+            threshold="v > {}*mV".format(self.threshold_voltage),
+            reset="v = {}*mV".format(self.reset_voltage),
+            method="exact",
         )
 
-        # Initialize node states (0 = inactive, 1 = active/fired)
-        self.node_states = np.zeros(num_nodes)
+        # Initialize membrane potentials
+        self.neurons.v = self.reset_voltage * mV
 
-        # Randomly activate some nodes initially
-        initial_active = np.random.choice(
-            num_nodes, size=int(num_nodes * initial_activation_prob), replace=False
+    def _create_connectivity(self):
+        """Create synaptic connections between neurons."""
+        # Generate random connectivity using NetworkX
+        G = nx.erdos_renyi_graph(
+            self.num_neurons, self.connection_prob, directed=True, seed=self.random_seed
         )
-        self.node_states[initial_active] = 1.0
 
-        # Store history for visualization
-        self.state_history = [self.node_states.copy()]
-        self.firing_history = []
+        # Convert to Brian2 synapses
+        sources = []
+        targets = []
+        for edge in G.edges():
+            sources.append(edge[0])
+            targets.append(edge[1])
 
-    def get_upstream_sum(self, node):
-        """Calculate the sum of values from upstream neighbors (predecessors)."""
-        predecessors = list(self.graph.predecessors(node))
-        return sum(self.node_states[pred] for pred in predecessors)
+        if sources:  # Only create synapses if there are connections
+            self.synapses = Synapses(
+                self.neurons, self.neurons, "w : volt", on_pre="v_post += w"
+            )
+            self.synapses.connect(i=sources, j=targets)
+            self.synapses.w = self.synaptic_weight * mV
+        else:
+            self.synapses = None
 
-    def step(self):
-        """Perform one simulation step."""
-        new_states = np.zeros(self.num_nodes)
-        fired_nodes = []
+        # Store network structure for visualization
+        self.graph = G
 
-        # Check each node to see if it should fire
-        for node in range(self.num_nodes):
-            upstream_sum = self.get_upstream_sum(node)
+    def _setup_monitoring(self):
+        """Setup monitors to record network activity."""
+        # Spike monitor
+        self.spike_monitor = SpikeMonitor(self.neurons)
 
-            # Node fires if upstream sum exceeds threshold
-            if upstream_sum >= self.threshold:
-                new_states[node] = 1.0
-                fired_nodes.append(node)
-            # Otherwise, node remains at 0 (or goes back to 0 if it was firing)
-            else:
-                new_states[node] = 0.0
+        # State monitor for membrane potentials
+        self.state_monitor = StateMonitor(self.neurons, "v", record=True)
 
-        # Update states
-        self.node_states = new_states
+    def _add_initial_stimulation(self, spike_prob):
+        """Add initial stimulation to some neurons."""
+        # Select random neurons for initial stimulation
+        num_initial = int(self.num_neurons * spike_prob)
+        if num_initial > 0:
+            initial_neurons = np.random.choice(
+                self.num_neurons, size=num_initial, replace=False
+            )
 
-        # Store history
-        self.state_history.append(self.node_states.copy())
-        self.firing_history.append(fired_nodes.copy())
+            # Create stimulus group
+            self.stimulus = SpikeGeneratorGroup(
+                num_initial, initial_neurons, [1] * num_initial * ms
+            )
 
-        return fired_nodes
+            # Connect stimulus to selected neurons
+            self.stim_synapses = Synapses(
+                self.stimulus, self.neurons, on_pre="v_post += 20*mV"
+            )
+            self.stim_synapses.connect(j="i")
+        else:
+            self.stimulus = None
+            self.stim_synapses = None
 
-    def simulate(self, num_steps=50):
-        """Run the simulation for a specified number of steps."""
+    def run_simulation(self):
+        """Run the spiking neural network simulation."""
+        print(f"Running simulation for {self.simulation_time} ms...")
         print(
-            f"Starting simulation with {self.num_nodes} nodes, threshold={self.threshold}"
+            f"Network: {self.num_neurons} neurons, "
+            f"{len(self.graph.edges())} connections"
         )
-        print(f"Initial active nodes: {np.where(self.node_states > 0)[0].tolist()}")
+        print(
+            f"Threshold: {self.threshold_voltage} mV, "
+            f"Synaptic weight: {self.synaptic_weight} mV"
+        )
 
-        for step_num in range(num_steps):
-            fired_nodes = self.step()
-            active_nodes = np.where(self.node_states > 0)[0].tolist()
+        # Run the simulation
+        run(self.simulation_time * ms)
 
-            if (
-                step_num < 10 or step_num % 10 == 0
-            ):  # Print first 10 steps, then every 10th
-                print(
-                    f"Step {step_num + 1}: Fired nodes: {fired_nodes}, Active nodes: {active_nodes}"
-                )
+        print("Simulation completed!")
+        print(f"Total spikes recorded: {len(self.spike_monitor.t)}")
 
-        print(f"Simulation completed after {num_steps} steps")
-
-    def visualize_network(self):
-        """Visualize the network structure."""
+    def visualize_network_structure(self):
+        """Visualize the network connectivity."""
         plt.figure(figsize=(12, 8))
 
         # Create layout
         pos = nx.spring_layout(self.graph, seed=self.random_seed)
 
         # Draw network
-        nx.draw_networkx_edges(self.graph, pos, alpha=0.5, arrows=True, arrowsize=20)
-
-        # Color nodes based on current state
-        node_colors = [
-            "red" if state > 0 else "lightblue" for state in self.node_states
-        ]
-        nx.draw_networkx_nodes(self.graph, pos, node_color=node_colors, node_size=500)
-
-        # Add labels
-        nx.draw_networkx_labels(self.graph, pos)
+        nx.draw_networkx_edges(
+            self.graph, pos, alpha=0.6, arrows=True, arrowsize=20, edge_color="gray"
+        )
+        nx.draw_networkx_nodes(
+            self.graph, pos, node_color="lightblue", node_size=500, alpha=0.8
+        )
+        nx.draw_networkx_labels(self.graph, pos, font_size=10)
 
         plt.title(
-            f"Network Structure (Red = Active, Blue = Inactive)\nThreshold = {self.threshold}"
+            f"Spiking Network Structure\n"
+            f"{self.num_neurons} neurons, {len(self.graph.edges())} connections"
         )
         plt.axis("off")
         plt.tight_layout()
         plt.show()
 
-    def visualize_dynamics(self):
-        """Visualize the dynamics over time."""
-        if len(self.state_history) < 2:
-            print("No simulation data to visualize. Run simulate() first.")
+    def visualize_spike_activity(self):
+        """Visualize spike raster plot and network activity."""
+        if len(self.spike_monitor.t) == 0:
+            print(
+                "No spikes recorded. Try lowering the threshold or increasing synaptic weights."
+            )
             return
 
-        # Create activity matrix (time x nodes)
-        activity_matrix = np.array(self.state_history)
+        fig, axes = plt.subplots(3, 1, figsize=(14, 10))
 
-        plt.figure(figsize=(12, 8))
-
-        # Plot 1: Activity heatmap
-        plt.subplot(2, 1, 1)
-        plt.imshow(
-            activity_matrix.T, aspect="auto", cmap="RdYlBu_r", interpolation="nearest"
+        # Spike raster plot
+        axes[0].scatter(
+            self.spike_monitor.t / ms, self.spike_monitor.i, s=2, alpha=0.7, color="red"
         )
-        plt.colorbar(label="Node State")
-        plt.ylabel("Node ID")
-        plt.title("Network Activity Over Time")
+        axes[0].set_xlabel("Time (ms)")
+        axes[0].set_ylabel("Neuron ID")
+        axes[0].set_title("Spike Raster Plot")
+        axes[0].grid(True, alpha=0.3)
 
-        # Plot 2: Total activity over time
-        plt.subplot(2, 1, 2)
-        total_activity = np.sum(activity_matrix, axis=1)
-        plt.plot(total_activity, "b-", linewidth=2)
-        plt.xlabel("Time Step")
-        plt.ylabel("Total Active Nodes")
-        plt.title("Total Network Activity")
-        plt.grid(True, alpha=0.3)
+        # Population firing rate
+        bin_size = 5  # ms
+        bins = np.arange(0, self.simulation_time + bin_size, bin_size)
+        spike_counts, _ = np.histogram(self.spike_monitor.t / ms, bins=bins)
+        firing_rate = spike_counts / (bin_size / 1000) / self.num_neurons  # Hz
+
+        axes[1].plot(bins[:-1], firing_rate, "b-", linewidth=2)
+        axes[1].set_xlabel("Time (ms)")
+        axes[1].set_ylabel("Population Firing Rate (Hz)")
+        axes[1].set_title("Network Activity Over Time")
+        axes[1].grid(True, alpha=0.3)
+
+        # Sample membrane potentials
+        sample_neurons = np.random.choice(
+            self.num_neurons, size=min(5, self.num_neurons), replace=False
+        )
+
+        for neuron_id in sample_neurons:
+            axes[2].plot(
+                self.state_monitor.t / ms,
+                self.state_monitor.v[neuron_id] / mV,
+                label=f"Neuron {neuron_id}",
+                alpha=0.7,
+            )
+
+        axes[2].axhline(
+            y=self.threshold_voltage, color="red", linestyle="--", label="Threshold"
+        )
+        axes[2].set_xlabel("Time (ms)")
+        axes[2].set_ylabel("Membrane Potential (mV)")
+        axes[2].set_title("Sample Membrane Potentials")
+        axes[2].legend()
+        axes[2].grid(True, alpha=0.3)
 
         plt.tight_layout()
         plt.show()
 
-    def get_network_stats(self):
-        """Get basic statistics about the network."""
-        stats = {
-            "num_nodes": self.num_nodes,
-            "num_edges": self.graph.number_of_edges(),
-            "density": nx.density(self.graph),
-            "threshold": self.threshold,
-            "current_active_nodes": int(np.sum(self.node_states)),
-            "avg_in_degree": np.mean([d for n, d in self.graph.in_degree()]),
-            "avg_out_degree": np.mean([d for n, d in self.graph.out_degree()]),
-        }
+    def get_network_statistics(self):
+        """Calculate and return network statistics."""
+        total_spikes = len(self.spike_monitor.t)
+        avg_firing_rate = (
+            total_spikes / (self.simulation_time / 1000) / self.num_neurons
+        )
 
-        if len(self.state_history) > 1:
-            activity_matrix = np.array(self.state_history)
-            stats["avg_activity"] = np.mean(np.sum(activity_matrix, axis=1))
-            stats["max_activity"] = np.max(np.sum(activity_matrix, axis=1))
+        # Calculate per-neuron statistics
+        unique_neurons, spike_counts = np.unique(
+            self.spike_monitor.i, return_counts=True
+        )
+        neurons_that_fired = len(unique_neurons)
+
+        # Network connectivity stats
+        in_degrees = [self.graph.in_degree(n) for n in self.graph.nodes()]
+        out_degrees = [self.graph.out_degree(n) for n in self.graph.nodes()]
+
+        stats = {
+            "total_neurons": self.num_neurons,
+            "total_connections": len(self.graph.edges()),
+            "network_density": nx.density(self.graph),
+            "total_spikes": total_spikes,
+            "neurons_that_fired": neurons_that_fired,
+            "avg_firing_rate_hz": avg_firing_rate,
+            "avg_in_degree": np.mean(in_degrees),
+            "avg_out_degree": np.mean(out_degrees),
+            "simulation_time_ms": self.simulation_time,
+        }
 
         return stats
 
-    def print_stats(self):
-        """Print network statistics."""
-        stats = self.get_network_stats()
-        print("\n=== Network Statistics ===")
-        for key, value in stats.items():
-            if isinstance(value, float):
-                print(f"{key}: {value:.2f}")
-            else:
-                print(f"{key}: {value}")
+    def print_statistics(self):
+        """Print comprehensive network statistics."""
+        stats = self.get_network_statistics()
 
-
-# %%
+        print("\n=== Spiking Network Statistics ===")
+        print("Network Structure:")
+        print(f"  Total neurons: {stats['total_neurons']}")
+        print(f"  Total connections: {stats['total_connections']}")
+        print(f"  Network density: {stats['network_density']:.3f}")
+        print(f"  Average in-degree: {stats['avg_in_degree']:.2f}")
+        print(f"  Average out-degree: {stats['avg_out_degree']:.2f}")
+        print("\nActivity:")
+        print(f"  Simulation time: {stats['simulation_time_ms']} ms")
+        print(f"  Total spikes: {stats['total_spikes']}")
+        print(
+            f"  Neurons that fired: {stats['neurons_that_fired']}/{stats['total_neurons']}"
+        )
+        print(f"  Average firing rate: {stats['avg_firing_rate_hz']:.2f} Hz")
 
 
 def main():
-    """Run a demonstration of the network blip simulation."""
-    print("=== Network Blip Simulation Demo ===\n")
+    """Run a demonstration of the spiking neural network simulation."""
+    print("=== Spiking Neural Network Simulation (Brian2) ===\n")
 
-    # Create simulation
-    sim = NetworkBlipSimulation(
-        num_nodes=15,
+    # Create simulation with parameters that encourage propagation
+    sim = SpikingNetworkSimulation(
+        num_neurons=20,
         connection_prob=0.4,
-        threshold=2.2,
-        initial_activation_prob=0.2,
+        threshold_voltage=-55.0,  # Lower threshold for easier firing
+        reset_voltage=-70.0,
+        synaptic_weight=15.0,  # Higher weight for stronger connections
+        simulation_time=150,  # Longer simulation
+        initial_spike_prob=0.3,  # More initial spikes
         random_seed=42,
     )
 
-    # Print initial stats
-    sim.print_stats()
-
-    # Visualize initial network
-    print("\nVisualizing initial network structure...")
-    sim.visualize_network()
+    # Visualize network structure
+    print("Visualizing network structure...")
+    sim.visualize_network_structure()
 
     # Run simulation
-    print("\nRunning simulation...")
-    sim.simulate(num_steps=30)
+    sim.run_simulation()
 
-    # Print final stats
-    sim.print_stats()
+    # Print statistics
+    sim.print_statistics()
 
-    # Visualize dynamics
-    print("\nVisualizing dynamics...")
-    sim.visualize_dynamics()
+    # Visualize results
+    print("\nVisualizing spike activity...")
+    sim.visualize_spike_activity()
 
 
 if __name__ == "__main__":
+    # Set Brian2 preferences for cleaner output
+    prefs.codegen.target = "numpy"  # Use numpy backend for compatibility
     main()
