@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
 from autodyn.utils.functions import unity
-from autodyn.core import control
 
 from autodyn.core.integrators.runge_kutta import rk_integrator
 
@@ -19,14 +18,14 @@ class system:
     def forward(self, inputs, params):
         return self.transfer_function(inputs, params)
 
+    def post_step(self, x_in):
+        return x_in
 
 class dsys(system):
     def __init__(self, f, D: int = 3):
         self.x = np.zeros((D, 1))
         self.D = D
         self.f = f
-
-        self.post_step = None
 
     def forward(self, T, dt=0.01, rasterize=True, **kwargs):
         tvect = np.arange(0, T, dt)
