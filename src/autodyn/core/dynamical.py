@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import scipy.signal as sig
 from autodyn.utils.functions import unity
+from autodyn.viz.phase import render_phase
 
 from autodyn.core.integrators.runge_kutta import rk_integrator
 
@@ -106,3 +107,6 @@ class system:
         plt.figure()
         plt.plot(np.real(self.raster[:, 0] * np.exp(1j * self.raster[:, 1])))
         plt.title("Measured Trajectories in Time")
+
+    def render(self, title: str = "Phase Portrait"):
+        render_phase(self.raster, title=title)
