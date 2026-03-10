@@ -1,19 +1,60 @@
+import threading
+import queue as _queue
+
 import numpy as np
+from scipy.ndimage import gaussian_filter1d
 from fury import actor, window, ui
 from fury.window import ShowManager
+
 from autodyn.core.integrators.runge_kutta import rk_integrator
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _time_colors(n: int) -> np.ndarray:
     t = np.linspace(0, 1, n)
     return np.column_stack([t, np.zeros_like(t), 1 - t])  # blue -> red
 
 
+def _smooth(raster: np.ndarray, sigma: float = 2.0) -> np.ndarray:
+    """Gaussian-smooth each axis independently."""
+    out = np.empty_like(raster)
+    for i in range(raster.shape[1]):
+        out[:, i] = gaussian_filter1d(raster[:, i], sigma=sigma)
+    return out
+
+
+def _glow_actors(raster: np.ndarray):
+    """Return three line actors that together produce a neon glow effect.
+
+    Outer → wide + transparent  (halo)
+    Mid   → medium              (bloom)
+    Core  → thin + fully opaque (bright spine)
+    """
+    s = _smooth(raster)
+    n = len(s)
+    c = _time_colors(n)
+
+    layers = [
+        # (colors_scale, line_width, opacity)
+        (0.35, 12, 0.10),
+        (0.65, 5,  0.28),
+        (1.00, 1.5, 1.0),
+    ]
+    actors = []
+    for scale, width, opacity in layers:
+        a = actor.line([s], colors=[c * scale])
+        a.GetProperty().SetLineWidth(width)
+        a.GetProperty().SetOpacity(opacity)
+        actors.append(a)
+    return actors
+
+
 def _run_sim(f, params: dict, T: float, dt: float, D: int, x0: np.ndarray) -> np.ndarray:
-    tvect = np.arange(0, T, dt)
     x_state = x0.copy()
     raster = []
-    for _ in tvect:
+    for _ in np.arange(0, T, dt):
         x_state = rk_integrator(f, x_state, dt=dt, **params)
         raster.append(x_state)
     return np.array(raster).squeeze()
@@ -27,6 +68,9 @@ def _slider_range(v: float):
     hi = max(v * 0.1, v * 5.0)
     return lo, hi
 
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
 
 def render_phase(
     raster: np.ndarray,
@@ -35,20 +79,19 @@ def render_phase(
     params: dict = None,
     T: float = None,
     dt: float = 0.01,
+    chat_callback=None,
 ):
-    """FURY-based 3D rendering of a phase-space trajectory.
-
-    If `f`, `params`, and `T` are supplied the window shows interactive
-    sliders that re-simulate on every change.
+    """FURY-based 3D rendering of a phase-space trajectory with glow.
 
     Parameters
     ----------
-    raster : np.ndarray  shape (T_steps, 3)
-    title  : window title
-    f      : dynamics callable  ``f(x, **params) -> np.ndarray``
-    params : dict of current parameter values (strings are coerced to float)
-    T      : total simulation time for re-simulation
-    dt     : integration step
+    raster        : np.ndarray  shape (T_steps, 3)
+    title         : window title
+    f             : dynamics callable ``f(x, **params) -> np.ndarray``
+    params        : current parameter values
+    T             : total simulation time for re-simulation
+    dt            : integration step
+    chat_callback : callable(text: str) -> dict — enables the chat sidebar
     """
     if raster.ndim != 2 or raster.shape[1] != 3:
         raise ValueError(f"raster must be (T, 3), got {raster.shape}")
@@ -56,10 +99,12 @@ def render_phase(
     interactive = f is not None and params is not None and T is not None
 
     scene = window.Scene()
-    scene.background((0.05, 0.05, 0.05))
+    scene.background((0.02, 0.02, 0.06))  # deep navy for contrast
 
-    line_actor = actor.line([raster], colors=[_time_colors(len(raster))])
-    scene.add(line_actor)
+    # Initial glow actors
+    glow_refs = _glow_actors(raster)
+    for a in glow_refs:
+        scene.add(a)
 
     if not interactive:
         window.show(scene, title=title, size=(900, 700))
@@ -67,25 +112,28 @@ def render_phase(
 
     # ------------------------------------------------------------------ state
     current_params = {k: float(eval(str(v))) for k, v in params.items()}
-    x0 = raster[0:1].T.copy()          # fix initial condition to avoid jumps
-    actor_ref = [line_actor]            # mutable container for swap
+    x0 = raster[0:1].T.copy()
 
-    # --------------------------------------------------------------- helpers
     def rebuild():
         new_raster = _run_sim(f, current_params, T, dt, 3, x0)
-        scene.rm(actor_ref[0])
-        new_actor = actor.line([new_raster], colors=[_time_colors(len(new_raster))])
-        scene.add(new_actor)
-        actor_ref[0] = new_actor
+        for a in glow_refs:
+            scene.rm(a)
+        glow_refs.clear()
+        for a in _glow_actors(new_raster):
+            scene.add(a)
+            glow_refs.append(a)
 
-    # Create ShowManager first — UI elements need the interactor to register callbacks
-    show_manager = ShowManager(scene, title=title, size=(1000, 700))
+    # ShowManager must exist before adding UI elements
+    win_h = 800 if chat_callback is not None else 700
+    show_manager = ShowManager(
+        scene, title=title, size=(1100, win_h), order_transparent=True
+    )
 
-    # --------------------------------------------------------------- panel
+    # ---------------------------------------------------- param slider panel
     n_params = len(current_params)
     panel_h = 50 + 65 * n_params
-    panel = ui.Panel2D(size=(280, panel_h), color=(0.12, 0.12, 0.12), opacity=0.85)
-    panel.center = (820, panel_h // 2 + 20)
+    param_panel = ui.Panel2D(size=(280, panel_h), color=(0.12, 0.12, 0.12), opacity=0.85)
+    param_panel.center = (970, win_h - panel_h // 2 - 20)
 
     for idx, (name, val) in enumerate(current_params.items()):
         lo, hi = _slider_range(val)
@@ -105,7 +153,87 @@ def render_phase(
 
         slider.on_change = _make_cb(name)
         y_frac = 1.0 - (idx + 1) / (n_params + 1)
-        panel.add_element(slider, (0.08, y_frac))
+        param_panel.add_element(slider, (0.08, y_frac))
 
-    scene.add(panel)
+    scene.add(param_panel)
+
+    # ------------------------------------------------------------ chat panel
+    if chat_callback is None:
+        show_manager.start()
+        return
+
+    update_queue = _queue.Queue()
+    chat_log = []
+    busy = [False]
+
+    CHAT_W, CHAT_H = 1080, 200
+    chat_panel = ui.Panel2D(size=(CHAT_W, CHAT_H), color=(0.08, 0.08, 0.08), opacity=0.92)
+    chat_panel.center = (CHAT_W // 2, CHAT_H // 2)
+
+    history_block = ui.TextBlock2D(
+        text="Ready — type a message and press Enter.",
+        font_size=13,
+        color=(0.85, 0.85, 0.85),
+        size=(CHAT_W - 20, 120),
+    )
+    chat_panel.add_element(history_block, (0.01, 0.40))
+
+    status_block = ui.TextBlock2D(
+        text="", font_size=12, color=(0.4, 0.9, 0.4), size=(300, 24),
+    )
+    chat_panel.add_element(status_block, (0.01, 0.18))
+
+    input_box = ui.TextBox2D(width=70, height=1, text="", color=(0.9, 0.9, 0.9), font_size=14)
+    chat_panel.add_element(input_box, (0.01, 0.05))
+
+    def _update_history():
+        history_block.message = "\n".join(chat_log[-5:])
+
+    def _send(msg: str):
+        if busy[0] or not msg:
+            return
+        chat_log.append(f"You: {msg}")
+        _update_history()
+        status_block.message = "Thinking..."
+        busy[0] = True
+
+        def _worker():
+            try:
+                new_params = chat_callback(msg)
+                coerced = {k: float(eval(str(v))) for k, v in new_params.items()}
+                summary = ", ".join(f"{k}={v:.3f}" for k, v in coerced.items())
+                update_queue.put(("params", coerced, f"Agent: {summary}"))
+            except Exception as e:
+                update_queue.put(("error", None, f"Error: {e}"))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    _original_key_press = input_box.text.on_key_press
+
+    def _patched_key_press(i_ren, obj, textbox):
+        key = i_ren.event.key
+        if key.lower() == "return":
+            msg = input_box.message.strip()
+            input_box.message = ""
+            _original_key_press(i_ren, obj, textbox)
+            _send(msg)
+        else:
+            _original_key_press(i_ren, obj, textbox)
+
+    input_box.text.on_key_press = _patched_key_press
+
+    def _process_queue(obj, event):
+        while not update_queue.empty():
+            kind, data, msg = update_queue.get()
+            if kind == "params":
+                current_params.update(data)
+                rebuild()
+            chat_log.append(msg)
+            _update_history()
+            status_block.message = ""
+            busy[0] = False
+
+    show_manager.add_timer_callback(True, 200, _process_queue)
+
+    scene.add(chat_panel)
     show_manager.start()
