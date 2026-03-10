@@ -11,3 +11,19 @@ dependencies = [
     "numpy>=2.2.4",
     "scipy>=1.15.2",
 ]
+
+[tool.uv.workspace]
+members = [
+    ".",
+    ".",
+    ".",
+    ".",
+]
+
+[tool.uv.sources]
+autodyn = { workspace = true, editable = true }
+
+[dependency-groups]
+dev = [
+    "autodyn",
+]
