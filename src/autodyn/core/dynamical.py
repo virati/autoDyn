@@ -83,13 +83,15 @@ class system:
         plt.plot(self.raster)
         plt.show()
 
-    def plot_phase(self):
+    def plot_phase(self, **kwargs):
+        title_add = '' if 'title' not in kwargs.keys() else kwargs['title']
+
         if self.D == 3:
             fig = plt.figure()
             ax = fig.add_subplot(projection="3d")
             ax.plot(self.raster[:, 0], self.raster[:, 1], self.raster[:, 2])
             plt.draw()
-            plt.title("Phase Portrait")
+            plt.title("Phase Portrait " + title_add)
         else:
             fig = plt.figure()
             plt.plot(self.raster)
