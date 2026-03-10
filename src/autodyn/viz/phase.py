@@ -1,5 +1,6 @@
 import threading
 import queue as _queue
+from string import printable as _printable
 
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
@@ -165,26 +166,35 @@ def render_phase(
     update_queue = _queue.Queue()
     chat_log = []
     busy = [False]
+    typed = [""]  # mutable text buffer
 
     CHAT_W, CHAT_H = 1080, 200
     chat_panel = ui.Panel2D(size=(CHAT_W, CHAT_H), color=(0.08, 0.08, 0.08), opacity=0.92)
     chat_panel.center = (CHAT_W // 2, CHAT_H // 2)
 
     history_block = ui.TextBlock2D(
-        text="Ready — type a message and press Enter.",
+        text="Ready. Just start typing and press Enter.",
         font_size=13,
-        color=(0.85, 0.85, 0.85),
-        size=(CHAT_W - 20, 120),
+        color=(0.78, 0.78, 0.85),
+        size=(CHAT_W - 20, 130),
     )
-    chat_panel.add_element(history_block, (0.01, 0.40))
+    chat_panel.add_element(history_block, (0.01, 0.38))
+
+    input_display = ui.TextBlock2D(
+        text="> _",
+        font_size=14,
+        color=(0.2, 1.0, 0.5),  # green terminal cursor
+        size=(CHAT_W - 20, 28),
+    )
+    chat_panel.add_element(input_display, (0.01, 0.05))
 
     status_block = ui.TextBlock2D(
-        text="", font_size=12, color=(0.4, 0.9, 0.4), size=(300, 24),
+        text="", font_size=12, color=(1.0, 0.8, 0.2), size=(400, 24),
     )
-    chat_panel.add_element(status_block, (0.01, 0.18))
+    chat_panel.add_element(status_block, (0.01, 0.20))
 
-    input_box = ui.TextBox2D(width=70, height=1, text="", color=(0.9, 0.9, 0.9), font_size=14)
-    chat_panel.add_element(input_box, (0.01, 0.05))
+    def _refresh_input():
+        input_display.message = "> " + typed[0] + "_"
 
     def _update_history():
         history_block.message = "\n".join(chat_log[-5:])
@@ -194,7 +204,7 @@ def render_phase(
             return
         chat_log.append(f"You: {msg}")
         _update_history()
-        status_block.message = "Thinking..."
+        status_block.message = "  Thinking..."
         busy[0] = True
 
         def _worker():
@@ -208,19 +218,23 @@ def render_phase(
 
         threading.Thread(target=_worker, daemon=True).start()
 
-    _original_key_press = input_box.text.on_key_press
-
-    def _patched_key_press(i_ren, obj, textbox):
-        key = i_ren.event.key
-        if key.lower() == "return":
-            msg = input_box.message.strip()
-            input_box.message = ""
-            _original_key_press(i_ren, obj, textbox)
+    # Raw VTK key observer — no TextBox2D focus/activation required
+    def _on_key(obj, _event):
+        key = obj.GetKeySym()
+        char = obj.GetKeyCode()
+        if key == "Return":
+            msg = typed[0].strip()
+            typed[0] = ""
+            _refresh_input()
             _send(msg)
-        else:
-            _original_key_press(i_ren, obj, textbox)
+        elif key in ("BackSpace", "Delete"):
+            typed[0] = typed[0][:-1]
+            _refresh_input()
+        elif char and char in _printable and char.strip():
+            typed[0] += char
+            _refresh_input()
 
-    input_box.text.on_key_press = _patched_key_press
+    show_manager.add_iren_callback(_on_key, event="KeyPressEvent")
 
     def _process_queue(obj, event):
         while not update_queue.empty():
