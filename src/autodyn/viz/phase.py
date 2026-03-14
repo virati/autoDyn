@@ -14,9 +14,51 @@ from autodyn.core.integrators.runge_kutta import rk_integrator
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _time_colors(n: int) -> np.ndarray:
-    t = np.linspace(0, 1, n)
-    return np.column_stack([t, np.zeros_like(t), 1 - t])  # blue -> red
+def _time_colors(n: int, hue_index: int = 0, total_hues: int = 1) -> np.ndarray:
+    """Time-gradient colours with a per-trajectory hue.
+
+    Each trajectory gets a maximally-separated hue (golden-ratio spacing
+    in HSV) so that even adjacent trajectories look drastically different.
+    Brightness ramps from dim → bright along the trajectory to show time.
+    """
+    t = np.linspace(0.4, 1.0, n)  # value ramp (time → brightness)
+    if total_hues <= 1:
+        return np.column_stack([t, np.zeros_like(t), 1 - t])  # blue → red
+
+    # Golden-ratio hue spacing gives maximally distinct colours
+    golden = (1 + np.sqrt(5)) / 2
+    hue = (hue_index * golden) % 1.0
+
+    # HSV → RGB with S=1, V ramped by time
+    # Using the sector formula directly to avoid importing colorsys per-point
+    h6 = hue * 6.0
+    sector = int(h6) % 6
+    frac = h6 - int(h6)
+    rgb_base = [
+        (1.0, frac, 0.0),          # 0: red→yellow
+        (1.0 - frac, 1.0, 0.0),    # 1: yellow→green
+        (0.0, 1.0, frac),          # 2: green→cyan
+        (0.0, 1.0 - frac, 1.0),    # 3: cyan→blue
+        (frac, 0.0, 1.0),          # 4: blue→magenta
+        (1.0, 0.0, 1.0 - frac),    # 5: magenta→red
+    ][sector]
+
+    r = np.full(n, rgb_base[0]) * t
+    g = np.full(n, rgb_base[1]) * t
+    b = np.full(n, rgb_base[2]) * t
+    return np.column_stack([r, g, b])
+
+
+def _pad_to_3d(raster: np.ndarray) -> np.ndarray:
+    """Pad or project raster to exactly 3 columns for 3-D rendering."""
+    D = raster.shape[1]
+    if D == 3:
+        return raster
+    if D < 3:
+        padding = np.zeros((raster.shape[0], 3 - D))
+        return np.column_stack([raster, padding])
+    # D > 3: keep first three dimensions
+    return raster[:, :3]
 
 
 def _smooth(raster: np.ndarray, sigma: float = 2.0) -> np.ndarray:
@@ -27,29 +69,30 @@ def _smooth(raster: np.ndarray, sigma: float = 2.0) -> np.ndarray:
     return out
 
 
-def _glow_actors(raster: np.ndarray):
-    """Return three line actors that together produce a neon glow effect.
+def _glow_actors_multi(rasters: list, M: int = 1):
+    """Return glow line actors for *M* trajectories.
 
-    Outer → wide + transparent  (halo)
-    Mid   → medium              (bloom)
-    Core  → thin + fully opaque (bright spine)
+    Each trajectory gets three layers (halo / bloom / core) with a
+    distinct hue so they are visually distinguishable.  The halo/bloom
+    layers keep the same hue at full saturation (only opacity differs)
+    so the colour stays recognisable even in the glow.
     """
-    s = _smooth(raster)
-    n = len(s)
-    c = _time_colors(n)
-
     layers = [
-        # (colors_scale, line_width, opacity)
-        (0.35, 12, 0.10),
-        (0.65, 5,  0.28),
-        (1.00, 1.5, 1.0),
+        # (line_width, opacity)
+        (12,  0.10),
+        (5,   0.28),
+        (1.5, 1.0),
     ]
     actors = []
-    for scale, width, opacity in layers:
-        a = actor.line([s], colors=[c * scale])
-        a.GetProperty().SetLineWidth(width)
-        a.GetProperty().SetOpacity(opacity)
-        actors.append(a)
+    for traj_idx, raster in enumerate(rasters):
+        s = _smooth(raster)
+        n = len(s)
+        c = _time_colors(n, hue_index=traj_idx, total_hues=M)
+        for width, opacity in layers:
+            a = actor.line([s], colors=c)
+            a.GetProperty().SetLineWidth(width)
+            a.GetProperty().SetOpacity(opacity)
+            actors.append(a)
     return actors
 
 
@@ -74,6 +117,15 @@ def _slider_range(v: float):
 # Main entry point
 # ---------------------------------------------------------------------------
 
+def _make_random_x0s(base_x0: np.ndarray, M: int, spread: float = 1.0):
+    """Generate M initial conditions: the original plus M-1 random perturbations."""
+    x0s = [base_x0.copy()]
+    for _ in range(M - 1):
+        perturb = base_x0 + np.random.normal(0, spread, base_x0.shape)
+        x0s.append(perturb)
+    return x0s
+
+
 def render_phase(
     raster: np.ndarray,
     title: str = "Phase Portrait",
@@ -82,29 +134,50 @@ def render_phase(
     T: float = None,
     dt: float = 0.01,
     chat_callback=None,
+    M: int = 1,
 ):
     """FURY-based 3D rendering of a phase-space trajectory with glow.
 
     Parameters
     ----------
-    raster        : np.ndarray  shape (T_steps, 3)
+    raster        : np.ndarray  shape (T_steps, D)
     title         : window title
     f             : dynamics callable ``f(x, **params) -> np.ndarray``
     params        : current parameter values
     T             : total simulation time for re-simulation
     dt            : integration step
     chat_callback : callable(text: str) -> dict — enables the chat sidebar
+    M             : number of trajectories from different initial conditions.
+                    Total rendered points stays ~ constant (T is split across M).
     """
-    if raster.ndim != 2 or raster.shape[1] != 3:
-        raise ValueError(f"raster must be (T, 3), got {raster.shape}")
+    if raster.ndim != 2 or raster.shape[1] < 1:
+        raise ValueError(f"raster must be (T, D) with D >= 1, got {raster.shape}")
+    M = max(1, int(M))
+    raw_D = raster.shape[1]
+    raw_x0 = raster[0:1].T.copy()
+
+    # Split time budget so total points ≈ original count
+    T_per = T / M if T is not None else None
 
     interactive = f is not None and params is not None and T is not None
 
     scene = window.Scene()
     scene.background((0.02, 0.02, 0.06))  # deep navy for contrast
 
-    # Initial glow actors
-    glow_refs = _glow_actors(raster)
+    # Build initial rasters: first trajectory from the provided raster (truncated
+    # to the per-trajectory budget), remaining M-1 from fresh simulations.
+    steps_per = len(raster) // M
+    if M == 1 or not interactive:
+        init_rasters = [_pad_to_3d(raster[:steps_per])]
+    else:
+        x0s = _make_random_x0s(raw_x0, M)
+        init_rasters = []
+        for x0_i in x0s:
+            r = _run_sim(f, {k: float(eval(str(v))) for k, v in params.items()},
+                         T_per, dt, raw_D, x0_i)
+            init_rasters.append(_pad_to_3d(r))
+
+    glow_refs = _glow_actors_multi(init_rasters, M)
     for a in glow_refs:
         scene.add(a)
 
@@ -114,14 +187,17 @@ def render_phase(
 
     # ------------------------------------------------------------------ state
     current_params = {k: float(eval(str(v))) for k, v in params.items()}
-    x0 = raster[0:1].T.copy()
+    current_x0s = _make_random_x0s(raw_x0, M)
 
     def rebuild():
-        new_raster = _run_sim(f, current_params, T, dt, 3, x0)
+        rasters = []
+        for x0_i in current_x0s:
+            r = _run_sim(f, current_params, T_per, dt, raw_D, x0_i)
+            rasters.append(_pad_to_3d(r))
         for a in glow_refs:
             scene.rm(a)
         glow_refs.clear()
-        for a in _glow_actors(new_raster):
+        for a in _glow_actors_multi(rasters, M):
             scene.add(a)
             glow_refs.append(a)
 
