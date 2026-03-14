@@ -1,3 +1,4 @@
+import time
 import threading
 import queue as _queue
 from string import printable as _printable
@@ -129,6 +130,50 @@ def render_phase(
     show_manager = ShowManager(
         scene, title=title, size=(1100, win_h), order_transparent=True
     )
+
+    # ------------------------------------------------- debounced zoom control
+    # VTK processes every scroll tick synchronously through OnMouseWheelForward/
+    # Backward on the interactor style, causing zoom to keep going long after
+    # you stop scrolling.  We replace those methods entirely so VTK never runs
+    # its built-in zoom, then batch-apply our own after scrolling settles.
+    _zoom_delta = [0]
+    _zoom_last = [0.0]
+    _ZOOM_IDLE_S = 0.10
+
+    iren = show_manager.iren
+    style = iren.GetInteractorStyle()
+
+    # Monkey-patch the style so VTK's built-in zoom is completely dead
+    style.OnMouseWheelForward = lambda: None
+    style.OnMouseWheelBackward = lambda: None
+
+    def _scroll_fwd(_obj, _event):
+        _zoom_delta[0] += 1
+        _zoom_last[0] = time.monotonic()
+
+    def _scroll_bwd(_obj, _event):
+        _zoom_delta[0] -= 1
+        _zoom_last[0] = time.monotonic()
+
+    # Priority 1.0 = fires before VTK's default handlers (priority 0)
+    iren.AddObserver("MouseWheelForwardEvent", _scroll_fwd, 1.0)
+    iren.AddObserver("MouseWheelBackwardEvent", _scroll_bwd, 1.0)
+
+    def _flush_zoom(_obj, _event):
+        if _zoom_delta[0] == 0:
+            return
+        if time.monotonic() - _zoom_last[0] < _ZOOM_IDLE_S:
+            return  # still scrolling — wait
+        delta = _zoom_delta[0]
+        _zoom_delta[0] = 0
+        cam = scene.GetActiveCamera()
+        factor = 1.1 ** (-delta)
+        cam.Dolly(factor)
+        if hasattr(scene, "ResetCameraClippingRange"):
+            scene.ResetCameraClippingRange()
+        show_manager.render()
+
+    show_manager.add_timer_callback(True, 50, _flush_zoom)
 
     # ---------------------------------------------------- param slider panel
     n_params = len(current_params)
