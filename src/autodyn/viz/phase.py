@@ -160,25 +160,23 @@ def render_phase(
     raw_D = raster.shape[1]
     raw_x0 = raster[0:1].T.copy()
 
-    # Split time budget so total points ≈ original count
-    T_per = T / M if T is not None else None
-
+    # Keep full T per trajectory; coarsen dt so total points ≈ original count
+    dt_eff = dt * M
     interactive = f is not None and params is not None and T is not None
 
     scene = window.Scene()
     scene.background((0.02, 0.02, 0.06))  # deep navy for contrast
 
-    # Build initial rasters: first trajectory from the provided raster (truncated
-    # to the per-trajectory budget), remaining M-1 from fresh simulations.
-    steps_per = len(raster) // M
+    # Build initial rasters: first from the provided raster (subsampled to
+    # match the coarser step), remaining M-1 from fresh simulations.
     if M == 1 or not interactive:
-        init_rasters = [_pad_to_3d(raster[:steps_per])]
+        init_rasters = [_pad_to_3d(raster[::M])]
     else:
         x0s = _make_random_x0s(raw_x0, M)
         init_rasters = []
         for x0_i in x0s:
             r = _run_sim(f, {k: float(eval(str(v))) for k, v in params.items()},
-                         T_per, dt, raw_D, x0_i)
+                         T, dt_eff, raw_D, x0_i)
             init_rasters.append(_pad_to_3d(r))
 
     glow_refs = _glow_actors_multi(init_rasters, M, uniform_color=uniform_color)
@@ -196,7 +194,7 @@ def render_phase(
     def rebuild():
         rasters = []
         for x0_i in current_x0s:
-            r = _run_sim(f, current_params, T_per, dt, raw_D, x0_i)
+            r = _run_sim(f, current_params, T, dt_eff, raw_D, x0_i)
             rasters.append(_pad_to_3d(r))
         for a in glow_refs:
             scene.rm(a)
