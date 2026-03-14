@@ -108,5 +108,5 @@ class system:
         plt.plot(np.real(self.raster[:, 0] * np.exp(1j * self.raster[:, 1])))
         plt.title("Measured Trajectories in Time")
 
-    def render(self, title: str = "Phase Portrait", f=None, params: dict = None, T: float = None, dt: float = 0.01, chat_callback=None, M: int = 1):
-        render_phase(self.raster, title=title, f=f, params=params, T=T, dt=dt, chat_callback=chat_callback, M=M)
+    def render(self, title: str = "Phase Portrait", f=None, params: dict = None, T: float = None, dt: float = 0.01, chat_callback=None, M: int = 1, uniform_color: bool = False):
+        render_phase(self.raster, title=title, f=f, params=params, T=T, dt=dt, chat_callback=chat_callback, M=M, uniform_color=uniform_color)

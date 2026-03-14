@@ -69,27 +69,28 @@ def _smooth(raster: np.ndarray, sigma: float = 2.0) -> np.ndarray:
     return out
 
 
-def _glow_actors_multi(rasters: list, M: int = 1):
+def _glow_actors_multi(rasters: list, M: int = 1, uniform_color: bool = False):
     """Return glow line actors for *M* trajectories.
 
-    Each trajectory gets three layers (halo / bloom / core) with a
-    distinct hue so they are visually distinguishable.  The halo/bloom
-    layers keep the same hue at full saturation (only opacity differs)
-    so the colour stays recognisable even in the glow.
+    When *uniform_color* is True, every trajectory uses the original
+    blue→red time-gradient (identical to the single-trajectory look).
+    Otherwise each trajectory gets a maximally-separated hue.
     """
     layers = [
-        # (line_width, opacity)
-        (12,  0.10),
-        (5,   0.28),
-        (1.5, 1.0),
+        # (brightness_scale, line_width, opacity)
+        (0.35, 12, 0.10),
+        (0.65, 5,  0.28),
+        (1.00, 1.5, 1.0),
     ]
     actors = []
+    effective_hues = 1 if uniform_color else M
     for traj_idx, raster in enumerate(rasters):
         s = _smooth(raster)
         n = len(s)
-        c = _time_colors(n, hue_index=traj_idx, total_hues=M)
-        for width, opacity in layers:
-            a = actor.line([s], colors=c)
+        c = _time_colors(n, hue_index=0 if uniform_color else traj_idx,
+                         total_hues=effective_hues)
+        for scale, width, opacity in layers:
+            a = actor.line([s], colors=np.clip(c * scale, 0, 1))
             a.GetProperty().SetLineWidth(width)
             a.GetProperty().SetOpacity(opacity)
             actors.append(a)
@@ -135,6 +136,7 @@ def render_phase(
     dt: float = 0.01,
     chat_callback=None,
     M: int = 1,
+    uniform_color: bool = False,
 ):
     """FURY-based 3D rendering of a phase-space trajectory with glow.
 
@@ -149,6 +151,8 @@ def render_phase(
     chat_callback : callable(text: str) -> dict — enables the chat sidebar
     M             : number of trajectories from different initial conditions.
                     Total rendered points stays ~ constant (T is split across M).
+    uniform_color : if True, all trajectories use the same blue→red colour
+                    scheme (original single-trajectory look).
     """
     if raster.ndim != 2 or raster.shape[1] < 1:
         raise ValueError(f"raster must be (T, D) with D >= 1, got {raster.shape}")
@@ -177,7 +181,7 @@ def render_phase(
                          T_per, dt, raw_D, x0_i)
             init_rasters.append(_pad_to_3d(r))
 
-    glow_refs = _glow_actors_multi(init_rasters, M)
+    glow_refs = _glow_actors_multi(init_rasters, M, uniform_color=uniform_color)
     for a in glow_refs:
         scene.add(a)
 
@@ -197,7 +201,7 @@ def render_phase(
         for a in glow_refs:
             scene.rm(a)
         glow_refs.clear()
-        for a in _glow_actors_multi(rasters, M):
+        for a in _glow_actors_multi(rasters, M, uniform_color=uniform_color):
             scene.add(a)
             glow_refs.append(a)
 
