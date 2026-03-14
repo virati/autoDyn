@@ -174,24 +174,24 @@ def render_phase(
 
     history_block = ui.TextBlock2D(
         text="Ready. Just start typing and press Enter.",
-        font_size=13,
+        font_size=18,
         color=(0.78, 0.78, 0.85),
-        size=(CHAT_W - 20, 130),
+        size=(CHAT_W, 130),
     )
-    chat_panel.add_element(history_block, (0.01, 0.38))
+    chat_panel.add_element(history_block, (0.0, 0.35))
 
     input_display = ui.TextBlock2D(
         text="> _",
-        font_size=14,
-        color=(0.2, 1.0, 0.5),  # green terminal cursor
-        size=(CHAT_W - 20, 28),
+        font_size=18,
+        color=(0.2, 1.0, 0.5),
+        size=(CHAT_W, 34),
     )
-    chat_panel.add_element(input_display, (0.01, 0.05))
+    chat_panel.add_element(input_display, (0.0, 0.02))
 
     status_block = ui.TextBlock2D(
-        text="", font_size=12, color=(1.0, 0.8, 0.2), size=(400, 24),
+        text="", font_size=15, color=(1.0, 0.8, 0.2), size=(CHAT_W, 28),
     )
-    chat_panel.add_element(status_block, (0.01, 0.20))
+    chat_panel.add_element(status_block, (0.0, 0.18))
 
     def _refresh_input():
         input_display.message = "> " + typed[0] + "_"
@@ -230,9 +230,12 @@ def render_phase(
         elif key in ("BackSpace", "Delete"):
             typed[0] = typed[0][:-1]
             _refresh_input()
-        elif char and char in _printable and char.strip():
+        elif char and char in _printable:
             typed[0] += char
             _refresh_input()
+        else:
+            return
+        show_manager.render()
 
     show_manager.add_iren_callback(_on_key, event="KeyPressEvent")
 
