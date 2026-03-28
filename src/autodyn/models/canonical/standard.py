@@ -14,6 +14,12 @@ def consensus(x, **kwargs):
 
     return new_x
 
+def blip(x, **kwargs):
+    # Make a dynamical system that is as close to a "Dirac Delta" in integration as possible.
+    # Rapid rise, less-than-one-timestep decay
+    new_x = np.zeros_like(x)
+    new_x[0] = -2 * x[0]    
+    return new_x
 
 def lorenz(x, **kwargs):
     new_x = np.zeros_like(x)

@@ -1,0 +1,6 @@
+- [ ] Add "unlesioned oracle" to do_multi_patient_lesion.py
+    - This will allow us to frame each of the lesioned patients
+- [ ] Take the "average" across time for all groups
+    - Show that "above", "below", and "control" can all look different, 
+    - and see how their groupings can be used (if?) to infer lesions
+- [ ] Map out which patients have lesions in hub nodeso

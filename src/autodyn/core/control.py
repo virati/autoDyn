@@ -1,4 +1,4 @@
-from autodyn.core.dsys import dsys
+from autodyn.core.dynamical import dsys
 import numpy as np
 
 

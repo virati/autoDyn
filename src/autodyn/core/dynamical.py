@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import networkx as nx
 from autodyn.utils.functions import unity
-from autodyn.core import control
+from typing import Union
 
 from autodyn.core.integrators.runge_kutta import rk_integrator
 
@@ -19,6 +19,9 @@ class system:
     def forward(self, inputs, params):
         return self.transfer_function(inputs, params)
 
+    def post_step(self, x_in):
+        return x_in
+
 
 class dsys(system):
     def __init__(self, f, D: int = 3):
@@ -26,7 +29,15 @@ class dsys(system):
         self.D = D
         self.f = f
 
-        self.post_step = None
+    def set_u(self, u_func: Union[callable, np.ndarray] = None):
+        if callable(u_func):
+            self.u = u_func
+        elif isinstance(u_func, np.ndarray):
+            self.u = lambda t: u_func[t]
+        else:
+            raise ValueError("u_func must be a callable or a numpy array.")
+
+        return self
 
     def forward(self, T, dt=0.01, rasterize=True, **kwargs):
         tvect = np.arange(0, T, dt)
