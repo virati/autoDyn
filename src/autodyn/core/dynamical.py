@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import scipy.signal as sig
 from autodyn.utils.functions import unity
+from autodyn.viz.phase import render_phase
 
 from autodyn.core.integrators.runge_kutta import rk_integrator
 
@@ -83,13 +84,15 @@ class system:
         plt.plot(self.raster)
         plt.show()
 
-    def plot_phase(self):
+    def plot_phase(self, **kwargs):
+        title_add = '' if 'title' not in kwargs.keys() else kwargs['title']
+
         if self.D == 3:
             fig = plt.figure()
             ax = fig.add_subplot(projection="3d")
             ax.plot(self.raster[:, 0], self.raster[:, 1], self.raster[:, 2])
             plt.draw()
-            plt.title("Phase Portrait")
+            plt.title("Phase Portrait " + title_add)
         else:
             fig = plt.figure()
             plt.plot(self.raster)
@@ -104,3 +107,6 @@ class system:
         plt.figure()
         plt.plot(np.real(self.raster[:, 0] * np.exp(1j * self.raster[:, 1])))
         plt.title("Measured Trajectories in Time")
+
+    def render(self, title: str = "Phase Portrait", f=None, params: dict = None, T: float = None, dt: float = 0.01, chat_callback=None, M: int = 1, uniform_color: bool = False):
+        render_phase(self.raster, title=title, f=f, params=params, T=T, dt=dt, chat_callback=chat_callback, M=M, uniform_color=uniform_color)
